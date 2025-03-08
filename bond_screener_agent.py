@@ -63,5 +63,5 @@ class CompanyFinancialAnalysisAgent:
 
 if __name__ == "__main__":
     agent = CompanyFinancialAnalysisAgent("company_insights_202503011114.csv")
-    result = agent.query("Non executive chairman of Zuari Agro Chemicals Limited.")
+    result = agent.query("Give an overview of the financial analysis of Navi-finserv Limited.")
     print(result)
