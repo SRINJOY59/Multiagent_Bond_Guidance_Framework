@@ -9,7 +9,7 @@ load_dotenv()
 class BondQueryResponse(BaseModel):
     binary_score: int = Field(..., description="1 for Bond Finder Agent, 0 for Cash Flow & Maturity Agent")
 
-class BondFinderAgent:
+class BondDirectoryAgent:
     def __init__(self, model):
         """
         Initializes the BondQueryRouter with a language model and API key.
@@ -81,10 +81,10 @@ if __name__ == "__main__":
     model = "llama3-70b-8192"
 
 
-    router = BondFinderAgent(model)
+    router = BondDirectoryAgent(model)
 
     # Sample Query
-    query = "List government bonds with the highest returns available today."
+    query = "Show me details for ISIN INE 123456789."
     routing_result = router.route_query(query)
 
     print(f"Routing Decision: {routing_result}")  # Expected Output: 1

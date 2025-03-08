@@ -13,7 +13,7 @@ from langchain.agents import AgentExecutor, create_tool_calling_agent
 from langchain_community.tools.tavily_search import TavilySearchResults
 
 
-class BondScreenergent:
+class BondScreeneragent:
     def __init__(self, csv_path = "company_insights_202503011114.csv", model_name="llama3-70b-8192", embedding_model="sentence-transformers/all-MiniLM-L6-v2"):
         load_dotenv()
         self.csv_path = csv_path
@@ -62,6 +62,6 @@ class BondScreenergent:
 
 
 if __name__ == "__main__":
-    agent = BondScreenergent()
+    agent = BondScreeneragent()
     result = agent.query("Give an overview of the financial analysis of Navi-finserv Limited.")
     print(result)

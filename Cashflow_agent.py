@@ -28,7 +28,7 @@ class ISINNotFoundError(Exception):
 class CompanyCashflow:
     def __init__(
         self, 
-        csv_path: str, 
+        csv_path: str = "cashflows.csv", 
         model_name: str = "llama3-70b-8192",
         embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
     ):
@@ -270,7 +270,7 @@ if __name__ == "__main__":
         print(f"Current Date and Time (UTC - YYYY-MM-DD HH:MM:SS formatted): {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')}")
         print(f"Current User's Login: bibhabasuiitkgp")
         
-        agent = CompanyCashflow("cashflows.csv")
+        agent = CompanyCashflow()
         
         while True:
             user_query = input("\nEnter your query (or 'exit' to quit): ").strip()
