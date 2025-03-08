@@ -3,7 +3,7 @@ from langgraph.graph import END
 from orchestratoragent import BondQueryRouter
 from bond_directory_agent import BondDirectoryAgent
 from bond_screener_agent import BondScreeneragent
-from Cashflow_agent import CashflowAgent
+from Cashflow_agent import CompanyCashflow
 from bond_finder_agent import BondFinderAgent
 from langchain_core.messages import HumanMessage, AIMessage
 
@@ -14,7 +14,7 @@ graph_builder = StateGraph(MessagesState)
 graph_builder.add_node("router", BondQueryRouter.route_query)
 graph_builder.add_node("directory", BondDirectoryAgent.route_query)
 graph_builder.add_node("screener", BondScreeneragent.query)
-graph_builder.add_node("cashflow", CashflowAgent.query)
+graph_builder.add_node("cashflow", CompanyCashflow.query)
 graph_builder.add_node("finder", BondFinderAgent.query)
 
 
