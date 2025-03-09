@@ -33,7 +33,7 @@ class BondQueryResponse(BaseModel):
     binary_score: int = Field(..., description="0 for Bond Directory Agent, 1 for Bond Screener Agent")
 
 class BondQueryRouter:
-    def __init__(self, model):
+    def __init__(self, model = "llama3-70b-8192"):
         """
         Initializes the BondQueryRouter with a language model.
         """
@@ -94,8 +94,7 @@ class BondQueryRouter:
         return response.binary_score
 
 if __name__ == "__main__":
-    model = "llama3-70b-8192"
-    router = BondQueryRouter(model)
+    router = BondQueryRouter()
 
     # Sample Queries
     queries = [
