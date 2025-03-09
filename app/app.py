@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import Any
 
-from Multiagent_Bond_Guidance_Framework.src.workflow import BondWorkflowChain
+from src.workflow import BondWorkflowChain
 
 app = FastAPI()
 
