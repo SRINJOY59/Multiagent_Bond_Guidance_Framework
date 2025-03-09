@@ -1,7 +1,16 @@
+import os
+import json
+import logging
 import datetime
 from dataclasses import dataclass
-from typing import Dict, Optional, Union
-from dateutil.relativedelta import relativedelta
+from typing import Dict, Any, Optional, Union, List
+from dotenv import load_dotenv
+from langchain_groq import ChatGroq
+from decimal import Decimal, ROUND_HALF_UP
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 @dataclass
 class BondCalculationRequest:
@@ -10,6 +19,7 @@ class BondCalculationRequest:
     investment_date: datetime.datetime
     units: int
     input_value: float  # yield_rate for price calculation, price for yield calculation
+    bond_data: Dict[str, Any]  # Bond details from the finder
 
 @dataclass
 class BondCalculationResponse:
@@ -17,92 +27,152 @@ class BondCalculationResponse:
     message: str
     calculation_type: str
     results: Dict[str, Union[float, str, int]]
-    bond_details: Dict[str, str]
-
-class BondDirectory:
-    def __init__(self):
-        self.bonds = bonds_details_cleaned.csv
-            # Add more bonds as neede
-    def get_bond_by_isin(self, isin: str) -> Optional[Dict]:
-        return self.bonds.get(isin)
-
-    def search_bond_by_issuer(self, issuer_name: str) -> list:
-        return [bond for bond in self.bonds.values() 
-                if issuer_name.lower() in bond['issuer_name'].lower()]
+    bond_details: Dict[str, Any]
 
 class BondCalculatorAgent:
-    def __init__(self):
-        self.bond_directory = BondDirectory()
+    """
+    Agent for calculating bond prices and yields using LLM for validation and processing.
+    Integrates with LangChain and Groq for natural language processing.
+    """
+    
+    def __init__(self, 
+                 llm_model_name: str = "llama2-70b-4096",
+                 api_key: Optional[str] = None):
+        """
+        Initialize the Bond Calculator Agent.
+        
+        Args:
+            llm_model_name: Name of the LLM model to use
+            api_key: Groq API key (will use environment variable if None)
+        """
+        # Load environment variables
+        load_dotenv()
+        
+        # Get API key from environment if not provided
+        if api_key is None:
+            api_key = os.getenv("GROQ_API_KEY")
+            if not api_key:
+                raise ValueError("GROQ_API_KEY environment variable not set and no API key provided.")
+        
+        # Initialize the LLM client
+        self.llm = ChatGroq(model_name=llm_model_name, api_key=api_key)
+        
+        # Constants for calculations
         self.days_in_year = 365
         self.payment_frequency = 2  # Semi-annual payments
+        
+        logger.info(f"BondCalculatorAgent initialized with model: {llm_model_name}")
 
-    def _calculate_cashflows(self, bond: Dict, investment_date: datetime.datetime, units: int) -> list:
-        """Calculate future cash flows from investment date"""
-        face_value = float(bond['face_value'].replace('₹', '').replace(',', '')) * units
-        coupon_rate = float(bond['coupon_rate'].replace('%', '')) / 100
-        annual_coupon = face_value * coupon_rate
-        semi_annual_coupon = annual_coupon / self.payment_frequency
+    def validate_calculation_request(self, request: Dict[str, Any]) -> tuple[bool, str, Optional[BondCalculationRequest]]:
+        """
+        Validate the calculation request using LLM for natural language understanding.
+        
+        Args:
+            request: Dictionary containing the calculation request parameters
+            
+        Returns:
+            tuple: (is_valid, error_message, processed_request)
+        """
+        system_prompt = """
+        You are a bond calculation validator. Verify if the provided calculation request is valid and complete.
+        Check for:
+        1. Valid ISIN
+        2. Valid calculation type (price or yield)
+        3. Valid investment date
+        4. Valid number of units
+        5. Valid input value (yield rate or price)
+        Return a JSON response with validation results.
+        """
 
-        maturity_date = datetime.datetime.strptime(bond['maturity_date'], '%d-%m-%Y')
-        allotment_date = datetime.datetime.strptime(bond['allotment_date'], '%d-%m-%Y')
+        user_prompt = f"""
+        Please validate this bond calculation request:
+        {json.dumps(request, default=str, indent=2)}
+        
+        Return JSON format:
+        {{
+            "is_valid": true/false,
+            "error_message": "error details if any",
+            "processed_request": {{
+                "normalized values if valid"
+            }}
+        }}
+        """
 
-        cashflows = []
-        current_date = allotment_date
-        while current_date < investment_date:
-            current_date += relativedelta(months=12//self.payment_frequency)
+        try:
+            # Get validation from LLM
+            messages = [
+                ("system", system_prompt),
+                ("user", user_prompt)
+            ]
+            
+            response = self.llm.invoke(messages)
+            validation_result = json.loads(response.content)
+            
+            if validation_result["is_valid"]:
+                # Create BondCalculationRequest from processed data
+                processed = validation_result["processed_request"]
+                calc_request = BondCalculationRequest(
+                    isin=processed["isin"],
+                    calculation_type=processed["calculation_type"],
+                    investment_date=datetime.datetime.strptime(
+                        processed["investment_date"], 
+                        "%Y-%m-%d %H:%M:%S"
+                    ),
+                    units=int(processed["units"]),
+                    input_value=float(processed["input_value"]),
+                    bond_data=request.get("bond_data", {})
+                )
+                return True, "", calc_request
+            else:
+                return False, validation_result["error_message"], None
 
-        while current_date <= maturity_date:
-            if current_date > investment_date:
-                if current_date == maturity_date:
-                    cashflows.append((current_date, semi_annual_coupon + face_value))
-                else:
-                    cashflows.append((current_date, semi_annual_coupon))
-            current_date += relativedelta(months=12//self.payment_frequency)
-
-        return cashflows
+        except Exception as e:
+            logger.error(f"Error in request validation: {str(e)}")
+            return False, f"Validation error: {str(e)}", None
 
     def calculate_price(self, request: BondCalculationRequest) -> BondCalculationResponse:
         """Calculate bond price given yield rate"""
         try:
-            bond = self.bond_directory.get_bond_by_isin(request.isin)
-            if not bond:
-                return BondCalculationResponse(
-                    success=False,
-                    message=f"Bond with ISIN {request.isin} not found",
-                    calculation_type="price",
-                    results={},
-                    bond_details={}
-                )
-
-            cashflows = self._calculate_cashflows(bond, request.investment_date, request.units)
+            # Extract bond details
+            face_value = float(request.bond_data['face_value'].replace('₹', '').replace(',', ''))
+            coupon_rate = float(request.bond_data['coupon_rate'].replace('%', '')) / 100
+            maturity_date = datetime.datetime.strptime(request.bond_data['maturity_date'], '%d-%m-%Y')
             
-            # Calculate prices and interest
+            # Calculate cash flows
+            annual_coupon = face_value * coupon_rate
+            semi_annual_coupon = annual_coupon / self.payment_frequency
+            
+            # Generate future cash flows
+            cashflows = []
+            current_date = request.investment_date
+            while current_date <= maturity_date:
+                if current_date > request.investment_date:
+                    if current_date == maturity_date:
+                        cashflows.append((current_date, semi_annual_coupon + face_value))
+                    else:
+                        cashflows.append((current_date, semi_annual_coupon))
+                current_date += datetime.timedelta(days=365//self.payment_frequency)
+
+            # Calculate present value
             dirty_price = 0
-            for payment_date, payment_amount in cashflows:
+            yield_rate = request.input_value / 100
+            
+            for payment_date, amount in cashflows:
                 time_to_payment = (payment_date - request.investment_date).days / self.days_in_year
-                discount_factor = 1 / ((1 + request.input_value/100) ** time_to_payment)
-                dirty_price += payment_amount * discount_factor
+                discount_factor = 1 / ((1 + yield_rate) ** time_to_payment)
+                dirty_price += amount * discount_factor
 
             # Calculate accrued interest
-            allotment_date = datetime.datetime.strptime(bond['allotment_date'], '%d-%m-%Y')
-            last_coupon_date = allotment_date
-            while last_coupon_date + relativedelta(months=6) <= request.investment_date:
-                last_coupon_date += relativedelta(months=6)
-
-            days_since_last_coupon = (request.investment_date - last_coupon_date).days
-            face_value = float(bond['face_value'].replace('₹', '').replace(',', '')) * request.units
-            coupon_rate = float(bond['coupon_rate'].replace('%', '')) / 100
-            annual_coupon = face_value * coupon_rate
-            daily_interest = annual_coupon / self.days_in_year
-            accrued_interest = daily_interest * days_since_last_coupon
-
+            days_since_last_coupon = (request.investment_date - maturity_date).days % (365//self.payment_frequency)
+            accrued_interest = (annual_coupon * days_since_last_coupon) / self.days_in_year
+            
             clean_price = dirty_price - accrued_interest
             
             results = {
-                "clean_price_per_unit": clean_price / request.units,
-                "clean_price_total": clean_price,
-                "dirty_price_per_unit": dirty_price / request.units,
-                "dirty_price_total": dirty_price,
+                "clean_price_per_unit": clean_price,
+                "clean_price_total": clean_price * request.units,
+                "dirty_price_per_unit": dirty_price,
+                "dirty_price_total": dirty_price * request.units,
                 "accrued_interest": accrued_interest,
                 "yield_rate": request.input_value,
                 "units": request.units,
@@ -114,68 +184,65 @@ class BondCalculatorAgent:
                 message="Price calculation successful",
                 calculation_type="price",
                 results=results,
-                bond_details=bond
+                bond_details=request.bond_data
             )
 
         except Exception as e:
+            logger.error(f"Error in price calculation: {str(e)}")
             return BondCalculationResponse(
                 success=False,
                 message=f"Error calculating price: {str(e)}",
                 calculation_type="price",
                 results={},
-                bond_details={}
+                bond_details=request.bond_data
             )
 
     def calculate_yield(self, request: BondCalculationRequest) -> BondCalculationResponse:
         """Calculate yield to maturity given price"""
         try:
-            bond = self.bond_directory.get_bond_by_isin(request.isin)
-            if not bond:
-                return BondCalculationResponse(
-                    success=False,
-                    message=f"Bond with ISIN {request.isin} not found",
-                    calculation_type="yield",
-                    results={},
-                    bond_details={}
-                )
-
+            # Extract bond details
+            face_value = float(request.bond_data['face_value'].replace('₹', '').replace(',', ''))
+            coupon_rate = float(request.bond_data['coupon_rate'].replace('%', '')) / 100
+            maturity_date = datetime.datetime.strptime(request.bond_data['maturity_date'], '%d-%m-%Y')
+            
             # Initial yield guess (use coupon rate as starting point)
-            yield_guess = float(bond['coupon_rate'].replace('%', ''))
+            yield_guess = coupon_rate * 100
             tolerance = 0.0001
             max_iterations = 100
-
+            
             # Calculate accrued interest
-            allotment_date = datetime.datetime.strptime(bond['allotment_date'], '%d-%m-%Y')
-            last_coupon_date = allotment_date
-            while last_coupon_date + relativedelta(months=6) <= request.investment_date:
-                last_coupon_date += relativedelta(months=6)
-
-            days_since_last_coupon = (request.investment_date - last_coupon_date).days
-            face_value = float(bond['face_value'].replace('₹', '').replace(',', '')) * request.units
-            coupon_rate = float(bond['coupon_rate'].replace('%', '')) / 100
+            days_since_last_coupon = (request.investment_date - maturity_date).days % (365//self.payment_frequency)
             annual_coupon = face_value * coupon_rate
-            daily_interest = annual_coupon / self.days_in_year
-            accrued_interest = daily_interest * days_since_last_coupon
-
+            accrued_interest = (annual_coupon * days_since_last_coupon) / self.days_in_year
+            
             # Target dirty price
             dirty_price = request.input_value + accrued_interest
-
+            
             # Newton-Raphson method to find yield
             for _ in range(max_iterations):
-                cashflows = self._calculate_cashflows(bond, request.investment_date, request.units)
-                price_guess = 0
-                for payment_date, payment_amount in cashflows:
-                    time_to_payment = (payment_date - request.investment_date).days / self.days_in_year
-                    discount_factor = 1 / ((1 + yield_guess/100) ** time_to_payment)
-                    price_guess += payment_amount * discount_factor
-
+                # Calculate price at current yield guess
+                price_calc_request = BondCalculationRequest(
+                    isin=request.isin,
+                    calculation_type="price",
+                    investment_date=request.investment_date,
+                    units=request.units,
+                    input_value=yield_guess,
+                    bond_data=request.bond_data
+                )
+                
+                price_result = self.calculate_price(price_calc_request)
+                if not price_result.success:
+                    raise ValueError(price_result.message)
+                
+                price_guess = price_result.results["dirty_price_per_unit"]
+                
                 if abs(price_guess - dirty_price) < tolerance:
                     results = {
                         "yield_to_maturity": yield_guess,
-                        "clean_price_per_unit": request.input_value / request.units,
-                        "clean_price_total": request.input_value,
-                        "dirty_price_per_unit": dirty_price / request.units,
-                        "dirty_price_total": dirty_price,
+                        "clean_price_per_unit": request.input_value,
+                        "clean_price_total": request.input_value * request.units,
+                        "dirty_price_per_unit": dirty_price,
+                        "dirty_price_total": dirty_price * request.units,
                         "accrued_interest": accrued_interest,
                         "units": request.units,
                         "investment_date": request.investment_date.strftime('%Y-%m-%d %H:%M:%S')
@@ -186,95 +253,139 @@ class BondCalculatorAgent:
                         message="Yield calculation successful",
                         calculation_type="yield",
                         results=results,
-                        bond_details=bond
+                        bond_details=request.bond_data
                     )
 
                 # Calculate derivative for Newton-Raphson
                 delta = 0.0001
-                price_plus_delta = 0
-                for payment_date, payment_amount in cashflows:
-                    time_to_payment = (payment_date - request.investment_date).days / self.days_in_year
-                    discount_factor = 1 / ((1 + (yield_guess + delta)/100) ** time_to_payment)
-                    price_plus_delta += payment_amount * discount_factor
-
+                price_calc_request.input_value = yield_guess + delta
+                price_plus_delta = self.calculate_price(price_calc_request).results["dirty_price_per_unit"]
+                
                 derivative = (price_plus_delta - price_guess) / delta
                 yield_guess = yield_guess - (price_guess - dirty_price) / derivative
-
+                
                 if yield_guess < 0:
                     yield_guess = 0
 
             raise ValueError("Yield calculation did not converge")
 
         except Exception as e:
+            logger.error(f"Error in yield calculation: {str(e)}")
             return BondCalculationResponse(
                 success=False,
                 message=f"Error calculating yield: {str(e)}",
                 calculation_type="yield",
                 results={},
-                bond_details={}
+                bond_details=request.bond_data
             )
 
-def format_response(response: BondCalculationResponse) -> str:
-    """Format the calculation response for the chatbot"""
-    if not response.success:
-        return f"Error: {response.message}"
+    def format_response(self, response: BondCalculationResponse) -> str:
+        """Format calculation response using LLM for natural language explanation"""
+        system_prompt = """
+        You are a bond calculation expert. Format the calculation results into a clear,
+        natural language response. Include all relevant details and explain the results
+        in a way that's easy to understand.
+        """
 
-    output = []
-    output.append("\nBond Details:")
-    output.append("=" * 50)
-    output.append(f"ISIN: {response.bond_details['isin']}")
-    output.append(f"Issuer: {response.bond_details['issuer_name']}")
-    output.append(f"Instrument: {response.bond_details['instrument_name']}")
-    output.append(f"Credit Rating: {response.bond_details['credit_rating']}")
-    output.append("=" * 50)
-    
-    output.append("\nCalculation Results:")
-    output.append("-" * 50)
-    results = response.results
-    
-    if response.calculation_type == "price":
-        output.append(f"Yield Rate: {results['yield_rate']:.2f}%")
-    else:
-        output.append(f"Yield to Maturity: {results['yield_to_maturity']:.2f}%")
+        user_prompt = f"""
+        Please format these bond calculation results into a clear response:
+        {json.dumps(response.__dict__, default=str, indent=2)}
         
-    output.append(f"Investment Date: {results['investment_date']}")
-    output.append(f"Number of Units: {results['units']}")
-    output.append(f"\nPer Unit Values:")
-    output.append(f"Clean Price: ₹{results['clean_price_per_unit']:,.2f}")
-    output.append(f"Dirty Price: ₹{results['dirty_price_per_unit']:,.2f}")
-    output.append(f"\nTotal Values:")
-    output.append(f"Clean Price: ₹{results['clean_price_total']:,.2f}")
-    output.append(f"Dirty Price: ₹{results['dirty_price_total']:,.2f}")
-    output.append(f"Accrued Interest: ₹{results['accrued_interest']:,.2f}")
-    
-    return "\n".join(output)
+        Include:
+        1. Bond details (ISIN, issuer, etc.)
+        2. Calculation type and inputs
+        3. Results with explanations
+        4. Any relevant notes or warnings
+        """
 
-# Example usage
-def process_bond_calculation_request(
-    isin: str,
-    calculation_type: str,
-    investment_date: str,
-    units: int,
-    input_value: float
-) -> str:
-    """Process a bond calculation request and return formatted results"""
-    
-    agent = BondCalculatorAgent()
-    
-    # Convert investment_date string to datetime
-    investment_date = datetime.datetime.strptime(investment_date, '%Y-%m-%d %H:%M:%S')
-    
-    request = BondCalculationRequest(
-        isin=isin,
-        calculation_type=calculation_type,
-        investment_date=investment_date,
-        units=units,
-        input_value=input_value
-    )
-    
-    if calculation_type == "price":
-        response = agent.calculate_price(request)
-    else:
-        response = agent.calculate_yield(request)
+        try:
+            messages = [
+                ("system", system_prompt),
+                ("user", user_prompt)
+            ]
+            
+            llm_response = self.llm.invoke(messages)
+            return llm_response.content
+
+        except Exception as e:
+            logger.error(f"Error formatting response: {str(e)}")
+            # Fallback to basic formatting
+            if not response.success:
+                return f"Error: {response.message}"
+
+            output = []
+            output.append("\nBond Calculation Results:")
+            output.append("=" * 50)
+            
+            # Bond details
+            output.append("Bond Details:")
+            output.append(f"ISIN: {response.bond_details.get('isin', 'N/A')}")
+            output.append(f"Issuer: {response.bond_details.get('issuer_name', 'N/A')}")
+            
+            # Calculation results
+            output.append("\nCalculation Results:")
+            output.append(f"Type: {response.calculation_type.title()}")
+            
+            results = response.results
+            for key, value in results.items():
+                if isinstance(value, (int, float)):
+                    if 'price' in key:
+                        output.append(f"{key.replace('_', ' ').title()}: ₹{value:,.2f}")
+                    elif 'rate' in key or 'yield' in key:
+                        output.append(f"{key.replace('_', ' ').title()}: {value:.2f}%")
+                    else:
+                        output.append(f"{key.replace('_', ' ').title()}: {value}")
+                else:
+                    output.append(f"{key.replace('_', ' ').title()}: {value}")
+
+            return "\n".join(output)
+
+    def process_calculation_request(self, query: Dict[str, Any]) -> str:
+        """
+        Process a bond calculation request from the orchestrator.
         
-    return format_response(response)
+        Args:
+            query: Dictionary containing the calculation request
+            
+        Returns:
+            str: Formatted calculation results
+        """
+        logger.info("Processing bond calculation request")
+        
+        # Validate the request
+        is_valid, error_message, calculation_request = self.validate_calculation_request(query)
+        
+        if not is_valid:
+            return f"Invalid calculation request: {error_message}"
+            
+        # Perform calculation
+        if calculation_request.calculation_type == "price":
+            response = self.calculate_price(calculation_request)
+        else:
+            response = self.calculate_yield(calculation_request)
+            
+        # Format and return response
+        return self.format_response(response)
+
+if __name__ == "__main__":
+    # Example usage
+    calculator = BondCalculatorAgent()
+    
+    # Example calculation request
+    sample_request = {
+        "isin": "INE002A08534",
+        "calculation_type": "price",
+        "investment_date": "2025-03-09 21:13:46",
+        "units": 100,
+        "input_value": 8.5,  # yield rate for price calculation
+        "bond_data": {
+            "isin": "INE002A08534",
+            "issuer_name": "RELIANCE INDUSTRIES LIMITED",
+            "face_value": "1000000",
+            "coupon_rate": "9.05%",
+            "maturity_date": "17-10-2028"
+        }
+    }
+    
+    result = calculator.process_calculation_request(sample_request)
+    print(result)
