@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tap Bonds</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Arial', sans-serif;
+        }
+
+        body {
+            background-color: #f5f5f5;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            background-color: #ffffff;
+            padding: 1rem 2rem;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            width: 150px;
+            height: auto;
+        }
+
+        .logo-text {
+            font-size: 24px;
+            font-weight: bold;
+            color: #0066cc;
+        }
+
+        .container {
+            max-width: 800px;
+            width: 100%;
+            margin: 2rem auto;
+            padding: 0 1rem;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .search-container {
+            margin-top: 3rem;
+            text-align: center;
+        }
+
+        .search-bar {
+            width: 100%;
+            padding: 1rem;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        .search-bar:focus {
+            border-color: #0066cc;
+        }
+
+        .search-button {
+            margin-top: 1rem;
+            padding: 0.8rem 1.5rem;
+            background-color: #0066cc;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .search-button:hover {
+            background-color: #0055aa;
+        }
+
+        .output-container {
+            margin-top: 2rem;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background-color: white;
+            min-height: 200px;
+            max-height: 50vh;
+            overflow-y: auto;
+            padding: 1rem;
+            display: none;
+        }
+
+        .output-container.active {
+            display: block;
+        }
+
+        .output-message {
+            margin-bottom: 1rem;
+            padding: 1rem;
+            border-radius: 8px;
+            background-color: #f0f8ff;
+            border-left: 3px solid #0066cc;
+        }
+
+        footer {
+            margin-top: auto;
+            padding: 1.5rem;
+            background-color: #333;
+            color: white;
+            text-align: center;
+        }
+
+        @media (max-width: 600px) {
+            .header {
+                padding: 1rem;
+            }
+            
+            .search-container {
+                margin-top: 1.5rem;
+            }
+            
+            .container {
+                margin: 1rem auto;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="logo-container">
+            <div class="logo-text">Tap Bonds</div>
+        </div>
+        <nav>
+            <!-- Empty nav for future menu items -->
+        </nav>
+    </header>
+
+    <div class="container">
+        <div class="search-container">
+            <h1>Welcome to Tap Bonds</h1>
+            <p style="margin: 1rem 0;">Find information about bonds and investment opportunities</p>
+            <input type="text" class="search-bar" id="searchInput" placeholder="Search for bonds or ask a question...">
+            <button class="search-button" id="searchButton">Search</button>
+        </div>
+
+        <div class="output-container" id="outputContainer">
+            <!-- Output messages will be added here by JavaScript -->
+        </div>
+    </div>
+
+    <footer>
+        <p>&copy; 2025 Tap Bonds. All rights reserved.</p>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const searchInput = document.getElementById('searchInput');
+            const searchButton = document.getElementById('searchButton');
+            const outputContainer = document.getElementById('outputContainer');
+
+            // Sample responses for demonstration
+            const responses = {
+                "bonds": "Bonds are fixed-income instruments that represent a loan made by an investor to a borrower (typically corporate or governmental).",
+                "treasury": "Treasury bonds are government debt securities issued by the U.S. Department of the Treasury.",
+                "corporate bonds": "Corporate bonds are debt securities issued by corporations and sold to investors.",
+                "municipal": "Municipal bonds are debt securities issued by states, cities, counties and other governmental entities.",
+                "yield": "Bond yield is the return an investor realizes on a bond.",
+                "maturity": "Maturity date is when the principal amount of a bond is to be paid in full.",
+                "default": "I don't have specific information about that. Please try another search term related to bonds."
+            };
+
+            // Function to handle search
+            function performSearch() {
+                const query = searchInput.value.toLowerCase().trim();
+                
+                if (query === '') return;
+                
+                // Show output container
+                outputContainer.classList.add('active');
+                
+                // Create response message
+                let responseText = responses.default;
+                
+                // Check for keywords in the query
+                for (const [keyword, response] of Object.entries(responses)) {
+                    if (query.includes(keyword)) {
+                        responseText = response;
+                        break;
+                    }
+                }
+                
+                // Create and append message element
+                const messageElement = document.createElement('div');
+                messageElement.className = 'output-message';
+                messageElement.textContent = responseText;
+                
+                outputContainer.appendChild(messageElement);
+                
+                // Scroll to the bottom of the output container
+                outputContainer.scrollTop = outputContainer.scrollHeight;
+                
+                // Clear input
+                searchInput.value = '';
+            }
+
+            // Event listeners
+            searchButton.addEventListener('click', performSearch);
+            
+            searchInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    performSearch();
+                }
+            });
+        });
+    </script>
+</body>
+</html>
