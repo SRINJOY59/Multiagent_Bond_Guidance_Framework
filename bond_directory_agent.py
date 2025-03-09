@@ -3,6 +3,30 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_groq import ChatGroq
 from dotenv import load_dotenv
 
+from langchain.globals import set_llm_cache
+import hashlib
+from gptcache import Cache
+from gptcache.manager.factory import manager_factory
+from gptcache.processor.pre import get_prompt
+from langchain_community.cache import GPTCache
+
+
+# Load environment variables
+load_dotenv()
+def get_hashed_name(name):
+    """Generate a hashed name for the LLM model to use in cache storage."""
+    return hashlib.sha256(name.encode()).hexdigest()
+def init_gptcache(cache_obj: Cache, llm: str):
+    """Initialize the GPTCache system."""
+    hashed_llm = get_hashed_name(llm)
+    cache_obj.init(
+        pre_embedding_func=get_prompt,
+        data_manager=manager_factory(manager="map", data_dir=f"map_cache_{hashed_llm}"),
+    )
+
+
+# Initialize GPT Cache
+set_llm_cache(GPTCache(init_gptcache))
 
 load_dotenv()
 
