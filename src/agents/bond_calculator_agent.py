@@ -35,7 +35,7 @@ class BondCalculatorAgent:
     """
     
     def __init__(self, 
-                 llm_model_name: str = "llama2-70b-4096",
+                 llm_model_name: str = "mixtral-8x7b-32768",
                  api_key: Optional[str] = None,
                  current_date: str = "2025-03-09 21:16:51",
                  current_user: str = "codegeek03"):
@@ -80,69 +80,128 @@ class BondCalculatorAgent:
         Returns:
             Tuple[bool, str, Optional[BondCalculationRequest]]: Validation result, error message, and processed request
         """
-        system_prompt = """
-        You are a bond calculation validator. Verify if the provided calculation request is valid and complete.
-        Check for:
-        1. Valid ISIN
-        2. Valid calculation type (price or yield)
-        3. Valid investment date
-        4. Valid number of units
-        5. Valid input value (yield rate or price)
-        Return a JSON response with validation results.
-        """
+        # First, perform basic validation without LLM
+        try:
+            required_fields = ['isin', 'calculation_type', 'investment_date', 'units', 'input_value', 'bond_data']
+            for field in required_fields:
+                if field not in request:
+                    return False, f"Missing required field: {field}", None
 
-        user_prompt = f"""
+            if request['calculation_type'] not in ['price', 'yield']:
+                return False, "Invalid calculation_type. Must be 'price' or 'yield'", None
+
+            try:
+                units = int(request['units'])
+                if units <= 0:
+                    return False, "Units must be positive", None
+            except (ValueError, TypeError):
+                return False, "Invalid units value", None
+
+            try:
+                input_value = float(request['input_value'])
+                if input_value <= 0:
+                    return False, "Input value must be positive", None
+            except (ValueError, TypeError):
+                return False, "Invalid input value", None
+
+            # Validate investment date format
+            try:
+                investment_date = datetime.datetime.strptime(request['investment_date'], "%Y-%m-%d %H:%M:%S")
+            except ValueError:
+                return False, "Invalid investment_date format. Use YYYY-MM-DD HH:MM:SS", None
+
+            # Validate bond data
+            required_bond_fields = ['isin', 'issuer_name', 'face_value', 'coupon_rate', 'maturity_date']
+            for field in required_bond_fields:
+                if field not in request['bond_data']:
+                    return False, f"Missing required bond data field: {field}", None
+
+            # Create BondCalculationRequest object
+            calc_request = BondCalculationRequest(
+                isin=request['isin'],
+                calculation_type=request['calculation_type'],
+                investment_date=investment_date,
+                units=units,
+                input_value=input_value,
+                bond_data=request['bond_data']
+            )
+
+            return True, "", calc_request
+
+        except Exception as e:
+            logger.error(f"Error in basic validation: {str(e)}")
+            return False, f"Validation error: {str(e)}", None
+
+    def format_validation_prompt(self, request: Dict[str, Any]) -> str:
+        """Format the validation prompt for the LLM"""
+        return f"""
         Please validate this bond calculation request:
-        {json.dumps(request, default=str, indent=2)}
+        
+        ISIN: {request.get('isin', 'N/A')}
+        Calculation Type: {request.get('calculation_type', 'N/A')}
+        Investment Date: {request.get('investment_date', 'N/A')}
+        Units: {request.get('units', 'N/A')}
+        Input Value: {request.get('input_value', 'N/A')}
+        
+        Bond Details:
+        {json.dumps(request.get('bond_data', {}), indent=2)}
         
         Current Date: {self.current_date}
         Current User: {self.current_user}
         
-        Return JSON format:
-        {{
-            "is_valid": true/false,
-            "error_message": "error details if any",
-            "processed_request": {{
-                "normalized values if valid"
-            }}
-        }}
+        Please verify:
+        1. ISIN format is valid
+        2. Calculation type is either 'price' or 'yield'
+        3. Investment date is a valid date
+        4. Units is a positive integer
+        5. Input value is a positive number
+        6. Bond data contains all required fields
+        
+        Respond with 'VALID' or explain why the request is invalid.
         """
 
+    def process_calculation_request(self, query: Dict[str, Any]) -> str:
+        """Process a bond calculation request"""
+        logger.info("Processing bond calculation request")
+        
         try:
-            # Get validation from LLM
+            # First perform basic validation
+            is_valid, error_message, calculation_request = self.validate_calculation_request(query)
+            if not is_valid:
+                return f"Invalid calculation request: {error_message}"
+            
+            # If basic validation passes, perform LLM validation
+            prompt = self.format_validation_prompt(query)
             messages = [
-                ("system", system_prompt),
-                ("user", user_prompt)
+                ("system", "You are a bond calculation validator. Verify the request and respond with 'VALID' or explain the issues."),
+                ("user", prompt)
             ]
             
-            response = self.llm.invoke(messages)
-            validation_result = json.loads(response.content)
+            try:
+                llm_response = self.llm.invoke(messages)
+                validation_text = llm_response.content.strip()
+                
+                if "VALID" not in validation_text.upper():
+                    return f"Invalid calculation request: {validation_text}"
+                
+            except Exception as e:
+                logger.error(f"Error in LLM validation: {str(e)}")
+                # If LLM validation fails, proceed with basic validation results
+                logger.info("Proceeding with basic validation results only")
             
-            if validation_result["is_valid"]:
-                # Create BondCalculationRequest from processed data
-                processed = validation_result["processed_request"]
-                calc_request = BondCalculationRequest(
-                    isin=processed["isin"],
-                    calculation_type=processed["calculation_type"],
-                    investment_date=datetime.datetime.strptime(
-                        processed["investment_date"], 
-                        "%Y-%m-%d %H:%M:%S"
-                    ),
-                    units=int(processed["units"]),
-                    input_value=float(processed["input_value"]),
-                    bond_data=request.get("bond_data", {})
-                )
-                return True, "", calc_request
+            # Perform calculation
+            if calculation_request.calculation_type == "price":
+                response = self.calculate_price(calculation_request)
             else:
-                return False, validation_result["error_message"], None
-
+                response = self.calculate_yield(calculation_request)
+                
+            # Format and return response
+            return self.format_response(response)
+            
         except Exception as e:
-            logger.error(f"Error in request validation: {str(e)}")
-            return False, f"Validation error: {str(e)}", None
-
-    # ... [Rest of the code remains the same] ...
-    # ... [Previous code remains the same until validate_calculation_request] ...
-
+            logger.error(f"Error in process_calculation_request: {str(e)}")
+            return f"Error processing calculation request: {str(e)}"
+        
     def calculate_price(self, request: BondCalculationRequest) -> BondCalculationResponse:
         """Calculate bond price given yield rate"""
         try:
