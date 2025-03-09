@@ -4,7 +4,9 @@ from bond_screener_agent import BondScreeneragent
 from Cashflow_agent import CompanyCashflow
 from bond_finder_agent import BondFinderAgent
 import pandas as pd
+from websearch import WebAgent
 from dotenv import load_dotenv
+from langchain_groq import ChatGroq
 
 load_dotenv()
 
@@ -15,6 +17,7 @@ class BondWorkflowChain:
         self.screener = BondScreeneragent()
         self.cashflow = CompanyCashflow()
         self.finder = BondFinderAgent()
+        self.llm = ChatGroq(model="llama3-70b-8192")
     
     def process_query(self, user_query):
         """
@@ -117,23 +120,34 @@ class BondWorkflowChain:
         return result_str
 
 
-def run_bond_workflow(user_query):
-    """
-    Process a user query through the bond workflow chain.
-    
-    Args:
-        user_query (str): The user's bond-related query
+    def run_bond_workflow(self, user_query):
+        """
+        Process a user query through the bond workflow chain.
         
-    Returns:
-        str: The final response
-    """
-    workflow = BondWorkflowChain()
-    result = workflow.process_query(user_query)
-    return result
+        Args:
+            user_query (str): The user's bond-related query
+            
+        Returns:
+            str: The final response
+        """
+        workflow = BondWorkflowChain()
+        result = workflow.process_query(user_query)
+        messages = [
+            ("system", "check if the result is complete or not, if it is not complete then tell no else tell yes, final response will be 'yes' or 'no'"),
+            ("human", f"User query : {user_query} \n {result}")
+        ]
+        answer = self.llm.invoke(messages)
+        if answer == 'yes':
+            return result
+        else:
+            result = WebAgent().get_info(user_query)
+
+        return result
 
 
 if __name__ == "__main__":
     user_query = "Which platform has the best yield for 5-year bonds?"
-    result = run_bond_workflow(user_query)
+    workflow = BondWorkflowChain()
+    result = workflow.run_bond_workflow(user_query)
     print("\nFinal Response:")
     print(result)
