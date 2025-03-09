@@ -15,7 +15,12 @@ from langchain.agents import AgentExecutor, create_tool_calling_agent
 from langchain_community.tools.tavily_search import TavilySearchResults
 
 class BondFinderAgent:
-    def __init__(self, csv_path, model_name="llama3-70b-8192", embedding_model="sentence-transformers/all-MiniLM-L6-v2"):
+    def __init__(
+        self, 
+        csv_path="../../data/bonds_details_cleaned.csv",
+        model_name="llama3-70b-8192",
+        embedding_model="sentence-transformers/all-MiniLM-L6-v2"
+    ):
         load_dotenv()
         self.csv_path = csv_path
         self.embedding_model = embedding_model
@@ -130,9 +135,9 @@ def export_bond_data_to_csv(agent, isin, output_path):
     return output_path
 
 if __name__ == "__main__":
-    # Initialize the agent
-    agent = BondFinderAgent("bond_trading_data.csv")
+    # Initialize the agent with default CSV path
+    agent = BondFinderAgent()
     
     # Example query
-    result = agent.query("What is the YTM and Face Value for ISIN XYZ123?")
+    result = agent.query("What is the YTM and Face Value for ISIN INE002A08534?")
     print(result)
