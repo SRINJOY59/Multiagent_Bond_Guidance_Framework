@@ -1,65 +1,87 @@
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
-from typing import Dict, Any, Optional
+import os
 from datetime import datetime
-import uvicorn
+from typing import Dict, Any, Optional
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel, Field
 from bond_calculator import BondCalculatorAgent
 
+# Initialize FastAPI app
 app = FastAPI(
     title="Bond Calculator API",
-    description="API for calculating bond prices and yields using LLM-powered validation",
+    description="API for calculating bond prices and yields",
     version="1.0.0"
 )
 
-class BondRequest(BaseModel):
+# Pydantic models for request/response validation
+class BondData(BaseModel):
     isin: str
-    calculation_type: str
-    investment_date: str
-    units: int
-    input_value: float
-    bond_data: Dict[str, Any]
+    issuer_name: str
+    face_value: str
+    coupon_rate: str
+    maturity_date: str
+
+class BondCalculationRequest(BaseModel):
+    isin: str = Field(..., description="ISIN of the bond")
+    calculation_type: str = Field(..., description="Type of calculation: 'price' or 'yield'")
+    investment_date: str = Field(..., description="Investment date in YYYY-MM-DD HH:MM:SS format")
+    units: int = Field(..., gt=0, description="Number of bond units")
+    input_value: float = Field(..., gt=0, description="Yield rate for price calculation or price for yield calculation")
+    bond_data: BondData
+
+# Initialize bond calculator
+calculator = BondCalculatorAgent(
+    current_date="2025-03-09 21:58:59",
+    current_user="codegeek03"
+)
 
 @app.get("/")
 async def root():
+    """Root endpoint returning API information"""
     return {
-        "message": "Bond Calculator API",
+        "name": "Bond Calculator API",
         "version": "1.0.0",
-        "endpoints": [
-            "/calculate",
-            "/health"
-        ]
-    }
-
-@app.get("/health")
-async def health_check():
-    return {
-        "status": "healthy",
-        "timestamp": datetime.utcnow().isoformat()
+        "status": "active",
+        "current_time": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
     }
 
 @app.post("/calculate")
-async def calculate_bond(request: BondRequest):
-    try:
-        # Initialize calculator with current timestamp
-        calculator = BondCalculatorAgent(
-            current_date=datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
-            current_user="api_user"  # You might want to get this from auth
-        )
+async def calculate_bond(request: BondCalculationRequest):
+    """
+    Calculate bond price or yield based on the provided parameters
+    
+    Args:
+        request (BondCalculationRequest): The calculation request parameters
         
-        # Convert Pydantic model to dict and process
-        calculation_result = calculator.process_calculation_request(request.dict())
+    Returns:
+        dict: Calculation results and formatted response
+    """
+    try:
+        # Convert request to dictionary
+        request_dict = request.dict()
+        
+        # Process calculation request
+        result = calculator.process_calculation_request(request_dict)
         
         return {
             "status": "success",
-            "result": calculation_result,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
+            "result": result
         }
         
     except Exception as e:
         raise HTTPException(
-            status_code=500,
-            detail=f"Calculation failed: {str(e)}"
+            status_code=400,
+            detail=str(e)
         )
 
+@app.get("/health")
+async def health_check():
+    """Health check endpoint"""
+    return {
+        "status": "healthy",
+        "timestamp": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+    }
+
 if __name__ == "__main__":
-    uvicorn.run("calculator_api:app", host="0.0.0.0", port=8000, reload=True)
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
