@@ -108,3 +108,5 @@ if __name__ == "__main__":
     for query in queries:
         routing_result = router.route_query(query)
         print(f"Query: {query} -> Routing Decision: {routing_result}")  # Expected Output: 0 or 1
+
+
