@@ -1,9 +1,12 @@
 import os
+import re
 import json
+import math
 import logging
 import datetime
-from dataclasses import dataclass
 from typing import Dict, Any, Optional, Union, List, Tuple
+from dataclasses import dataclass
+from functools import lru_cache
 from dotenv import load_dotenv
 from langchain_groq import ChatGroq
 
@@ -37,7 +40,7 @@ class BondCalculatorAgent:
     def __init__(self, 
                  llm_model_name: str = "mixtral-8x7b-32768",
                  api_key: Optional[str] = None,
-                 current_date: str = "2025-03-09 21:16:51",
+                 current_date: str = "2025-03-09 21:50:36",
                  current_user: str = "codegeek03"):
         """
         Initialize the Bond Calculator Agent.
@@ -68,11 +71,22 @@ class BondCalculatorAgent:
         self.days_in_year = 365
         self.payment_frequency = 2  # Semi-annual payments
         
+        # Initialize response cache
+        self.response_cache = {}
+        
         logger.info(f"BondCalculatorAgent initialized with model: {llm_model_name}")
+
+    def get_last_coupon_date(self, current_date: datetime.datetime, maturity_date: datetime.datetime) -> datetime.datetime:
+        """Calculate the last coupon date before the current date"""
+        days_per_period = 365 // self.payment_frequency
+        days_to_maturity = (maturity_date - current_date).days
+        periods_to_maturity = math.ceil(days_to_maturity / days_per_period)
+        last_coupon = maturity_date - datetime.timedelta(days=periods_to_maturity * days_per_period)
+        return last_coupon
 
     def validate_calculation_request(self, request: Dict[str, Any]) -> Tuple[bool, str, Optional[BondCalculationRequest]]:
         """
-        Validate the calculation request using LLM for natural language understanding.
+        Validate the calculation request using basic validation and LLM.
         
         Args:
             request: Dictionary containing the calculation request parameters
@@ -80,8 +94,12 @@ class BondCalculatorAgent:
         Returns:
             Tuple[bool, str, Optional[BondCalculationRequest]]: Validation result, error message, and processed request
         """
-        # First, perform basic validation without LLM
         try:
+            # Validate ISIN format
+            if not re.match(r'^[A-Z]{2}[A-Z0-9]{9}[0-9]$', request['isin']):
+                return False, "Invalid ISIN format", None
+
+            # Basic field validation
             required_fields = ['isin', 'calculation_type', 'investment_date', 'units', 'input_value', 'bond_data']
             for field in required_fields:
                 if field not in request:
@@ -101,14 +119,26 @@ class BondCalculatorAgent:
                 input_value = float(request['input_value'])
                 if input_value <= 0:
                     return False, "Input value must be positive", None
+                
+                # Validate reasonable ranges
+                if request['calculation_type'] == 'yield':
+                    if input_value > 10000000:  # Max price validation
+                        return False, "Price out of reasonable range", None
+                else:  # price calculation
+                    if input_value > 100:  # Max yield rate validation
+                        return False, "Yield rate out of reasonable range", None
             except (ValueError, TypeError):
                 return False, "Invalid input value", None
 
-            # Validate investment date format
+            # Validate dates
             try:
                 investment_date = datetime.datetime.strptime(request['investment_date'], "%Y-%m-%d %H:%M:%S")
-            except ValueError:
-                return False, "Invalid investment_date format. Use YYYY-MM-DD HH:MM:SS", None
+                maturity_date = datetime.datetime.strptime(request['bond_data']['maturity_date'], '%d-%m-%Y')
+                
+                if maturity_date <= investment_date:
+                    return False, "Maturity date must be after investment date", None
+            except ValueError as e:
+                return False, f"Invalid date format: {str(e)}", None
 
             # Validate bond data
             required_bond_fields = ['isin', 'issuer_name', 'face_value', 'coupon_rate', 'maturity_date']
@@ -129,84 +159,14 @@ class BondCalculatorAgent:
             return True, "", calc_request
 
         except Exception as e:
-            logger.error(f"Error in basic validation: {str(e)}")
+            logger.error(f"Error in validation: {str(e)}")
             return False, f"Validation error: {str(e)}", None
 
-    def format_validation_prompt(self, request: Dict[str, Any]) -> str:
-        """Format the validation prompt for the LLM"""
-        return f"""
-        Please validate this bond calculation request:
-        
-        ISIN: {request.get('isin', 'N/A')}
-        Calculation Type: {request.get('calculation_type', 'N/A')}
-        Investment Date: {request.get('investment_date', 'N/A')}
-        Units: {request.get('units', 'N/A')}
-        Input Value: {request.get('input_value', 'N/A')}
-        
-        Bond Details:
-        {json.dumps(request.get('bond_data', {}), indent=2)}
-        
-        Current Date: {self.current_date}
-        Current User: {self.current_user}
-        
-        Please verify:
-        1. ISIN format is valid
-        2. Calculation type is either 'price' or 'yield'
-        3. Investment date is a valid date
-        4. Units is a positive integer
-        5. Input value is a positive number
-        6. Bond data contains all required fields
-        
-        Respond with 'VALID' or explain why the request is invalid.
-        """
-
-    def process_calculation_request(self, query: Dict[str, Any]) -> str:
-        """Process a bond calculation request"""
-        logger.info("Processing bond calculation request")
-        
-        try:
-            # First perform basic validation
-            is_valid, error_message, calculation_request = self.validate_calculation_request(query)
-            if not is_valid:
-                return f"Invalid calculation request: {error_message}"
-            
-            # If basic validation passes, perform LLM validation
-            prompt = self.format_validation_prompt(query)
-            messages = [
-                ("system", "You are a bond calculation validator. Verify the request and respond with 'VALID' or explain the issues."),
-                ("user", prompt)
-            ]
-            
-            try:
-                llm_response = self.llm.invoke(messages)
-                validation_text = llm_response.content.strip()
-                
-                if "VALID" not in validation_text.upper():
-                    return f"Invalid calculation request: {validation_text}"
-                
-            except Exception as e:
-                logger.error(f"Error in LLM validation: {str(e)}")
-                # If LLM validation fails, proceed with basic validation results
-                logger.info("Proceeding with basic validation results only")
-            
-            # Perform calculation
-            if calculation_request.calculation_type == "price":
-                response = self.calculate_price(calculation_request)
-            else:
-                response = self.calculate_yield(calculation_request)
-                
-            # Format and return response
-            return self.format_response(response)
-            
-        except Exception as e:
-            logger.error(f"Error in process_calculation_request: {str(e)}")
-            return f"Error processing calculation request: {str(e)}"
-        
     def calculate_price(self, request: BondCalculationRequest) -> BondCalculationResponse:
         """Calculate bond price given yield rate"""
         try:
-            # Extract bond details
-            face_value = float(request.bond_data['face_value'].replace('₹', '').replace(',', ''))
+            # Extract and sanitize bond details
+            face_value = float(str(request.bond_data['face_value']).replace('₹', '').replace(',', ''))
             coupon_rate = float(request.bond_data['coupon_rate'].replace('%', '')) / 100
             maturity_date = datetime.datetime.strptime(request.bond_data['maturity_date'], '%d-%m-%Y')
             
@@ -235,7 +195,8 @@ class BondCalculatorAgent:
                 dirty_price += amount * discount_factor
 
             # Calculate accrued interest
-            days_since_last_coupon = (request.investment_date - maturity_date).days % (365//self.payment_frequency)
+            last_coupon_date = self.get_last_coupon_date(request.investment_date, maturity_date)
+            days_since_last_coupon = (request.investment_date - last_coupon_date).days
             accrued_interest = (annual_coupon * days_since_last_coupon) / self.days_in_year
             
             clean_price = dirty_price - accrued_interest
@@ -270,167 +231,182 @@ class BondCalculatorAgent:
                 bond_details=request.bond_data
             )
 
-def calculate_yield(self, request: BondCalculationRequest) -> BondCalculationResponse:
-    """Calculate yield to maturity given price using binary search method"""
-    try:
-        # Extract bond details
-        face_value = float(request.bond_data['face_value'].replace('₹', '').replace(',', ''))
-        coupon_rate = float(request.bond_data['coupon_rate'].replace('%', '')) / 100
-        maturity_date = datetime.datetime.strptime(request.bond_data['maturity_date'], '%d-%m-%Y')
-        
-        # Calculate time to maturity in years
-        time_to_maturity = (maturity_date - request.investment_date).days / self.days_in_year
-        
-        if time_to_maturity <= 0:
-            raise ValueError("Bond has matured")
+    def calculate_yield(self, request: BondCalculationRequest) -> BondCalculationResponse:
+        """Calculate yield to maturity given price using binary search method"""
+        try:
+            # Extract and sanitize bond details
+            face_value = float(str(request.bond_data['face_value']).replace('₹', '').replace(',', ''))
+            coupon_rate = float(request.bond_data['coupon_rate'].replace('%', '')) / 100
+            maturity_date = datetime.datetime.strptime(request.bond_data['maturity_date'], '%d-%m-%Y')
             
-        # Calculate annual coupon payment
-        annual_coupon = face_value * coupon_rate
-        semi_annual_coupon = annual_coupon / self.payment_frequency
-        
-        # Calculate accrued interest
-        days_since_last_coupon = (request.investment_date - maturity_date).days % (365//self.payment_frequency)
-        accrued_interest = (annual_coupon * days_since_last_coupon) / self.days_in_year
-        
-        # Target dirty price
-        dirty_price = request.input_value + accrued_interest
-        
-        # Binary search parameters
-        lower_yield = 0.0001  # 0.01%
-        upper_yield = 1.0     # 100%
-        tolerance = 0.0001
-        max_iterations = 50
-        
-        def calculate_price_at_yield(ytm):
-            """Helper function to calculate price at a given yield"""
-            price = 0
-            periods = int(time_to_maturity * self.payment_frequency)
+            # Calculate time to maturity in years
+            time_to_maturity = (maturity_date - request.investment_date).days / self.days_in_year
             
-            for i in range(1, periods + 1):
-                time_to_payment = i / self.payment_frequency
-                discount_factor = 1 / ((1 + ytm) ** time_to_payment)
+            if time_to_maturity <= 0:
+                raise ValueError("Bond has matured")
                 
-                if i == periods:
-                    # Last payment includes face value
-                    payment = semi_annual_coupon + face_value
-                else:
-                    payment = semi_annual_coupon
+            # Calculate annual coupon payment
+            annual_coupon = face_value * coupon_rate
+            semi_annual_coupon = annual_coupon / self.payment_frequency
+            
+            # Calculate accrued interest
+            last_coupon_date = self.get_last_coupon_date(request.investment_date, maturity_date)
+            days_since_last_coupon = (request.investment_date - last_coupon_date).days
+            accrued_interest = (annual_coupon * days_since_last_coupon) / self.days_in_year
+            
+            # Target dirty price
+            dirty_price = request.input_value + accrued_interest
+            
+            # Binary search parameters
+            lower_yield = 0.0001  # 0.01%
+            upper_yield = 1.0     # 100%
+            tolerance = 0.0001
+            max_iterations = 50
+            
+            def calculate_price_at_yield(ytm):
+                """Helper function to calculate price at a given yield"""
+                price = 0
+                periods = int(time_to_maturity * self.payment_frequency)
+                
+                for i in range(1, periods + 1):
+                    time_to_payment = i / self.payment_frequency
+                    discount_factor = 1 / ((1 + ytm) ** time_to_payment)
                     
-                price += payment * discount_factor
-            
-            return price
-            
-        # Binary search for yield
-        for _ in range(max_iterations):
-            current_yield = (lower_yield + upper_yield) / 2
-            calculated_price = calculate_price_at_yield(current_yield)
-            
-            if abs(calculated_price - dirty_price) < tolerance:
-                # Found the yield
-                ytm = current_yield * 100  # Convert to percentage
+                    if i == periods:
+                        # Last payment includes face value
+                        payment = semi_annual_coupon + face_value
+                    else:
+                        payment = semi_annual_coupon
+                        
+                    price += payment * discount_factor
                 
-                results = {
-                    "yield_to_maturity": ytm,
-                    "clean_price_per_unit": request.input_value,
-                    "clean_price_total": request.input_value * request.units,
-                    "dirty_price_per_unit": dirty_price,
-                    "dirty_price_total": dirty_price * request.units,
-                    "accrued_interest": accrued_interest,
-                    "time_to_maturity": time_to_maturity,
-                    "annual_coupon": annual_coupon,
-                    "units": request.units,
-                    "investment_date": request.investment_date.strftime('%Y-%m-%d %H:%M:%S'),
-                    "calculation_date": self.current_date.strftime('%Y-%m-%d %H:%M:%S')
-                }
+                return price
                 
-                return BondCalculationResponse(
-                    success=True,
-                    message="Yield calculation successful",
-                    calculation_type="yield",
-                    results=results,
-                    bond_details=request.bond_data
-                )
+            # Binary search for yield
+            for _ in range(max_iterations):
+                current_yield = (lower_yield + upper_yield) / 2
+                calculated_price = calculate_price_at_yield(current_yield)
+                
+                if abs(calculated_price - dirty_price) < tolerance:
+                    # Found the yield
+                    ytm = current_yield * 100  # Convert to percentage
+                    
+                    results = {
+                        "yield_to_maturity": ytm,
+                        "clean_price_per_unit": request.input_value,
+                        "clean_price_total": request.input_value * request.units,
+                        "dirty_price_per_unit": dirty_price,
+                        "dirty_price_total": dirty_price * request.units,
+                        "accrued_interest": accrued_interest,
+                        "time_to_maturity": time_to_maturity,
+                        "annual_coupon": annual_coupon,
+                        "units": request.units,
+                        "investment_date": request.investment_date.strftime('%Y-%m-%d %H:%M:%S'),
+                        "calculation_date": self.current_date.strftime('%Y-%m-%d %H:%M:%S')
+                    }
+                    
+                    return BondCalculationResponse(
+                        success=True,
+                        message="Yield calculation successful",
+                        calculation_type="yield",
+                        results=results,
+                        bond_details=request.bond_data
+                    )
+                
+                if calculated_price > dirty_price:
+                    lower_yield = current_yield
+                else:
+                    upper_yield = current_yield
+                    
+            raise ValueError("Yield calculation did not converge within tolerance")
             
-            if calculated_price > dirty_price:
-                lower_yield = current_yield
-            else:
-                upper_yield = current_yield
-                
-        raise ValueError("Yield calculation did not converge within tolerance")
-        
-    except Exception as e:
-        logger.error(f"Error in yield calculation: {str(e)}")
-        return BondCalculationResponse(
-            success=False,
-            message=f"Error calculating yield: {str(e)}",
-            calculation_type="yield",
-            results={},
-            bond_details=request.bond_data
-        )
+        except Exception as e:
+            logger.error(f"Error in yield calculation: {str(e)}")
+            return BondCalculationResponse(
+                success=False,
+                message=f"Error calculating yield: {str(e)}",
+                calculation_type="yield",
+                results={},
+                bond_details=request.bond_data
+            )
+
+    @lru_cache(maxsize=100)
+    def _get_llm_response(self, prompt: str) -> str:
+        """Cached LLM response getter"""
+        messages = [
+            ("system", "You are a bond calculation expert. Format the calculation results into a clear, natural language response."),
+            ("user", prompt)
+        ]
+        return self.llm.invoke(messages).content
 
     def format_response(self, response: BondCalculationResponse) -> str:
         """Format calculation response using LLM for natural language explanation"""
-        system_prompt = """
-        You are a bond calculation expert. Format the calculation results into a clear,
-        natural language response. Include all relevant details and explain the results
-        in a way that's easy to understand.
-        """
-
-        user_prompt = f"""
-        Please format these bond calculation results into a clear response:
-        {json.dumps(response.__dict__, default=str, indent=2)}
-        
-        Current Date: {self.current_date}
-        Current User: {self.current_user}
-        
-        Include:
-        1. Bond details (ISIN, issuer, etc.)
-        2. Calculation type and inputs
-        3. Results with explanations
-        4. Any relevant notes or warnings
-        """
-
         try:
-            messages = [
-                ("system", system_prompt),
-                ("user", user_prompt)
-            ]
+            cache_key = f"{response.calculation_type}:{response.bond_details['isin']}:{response.results.get('yield_rate', '')}:{response.results.get('clean_price_per_unit', '')}"
             
-            llm_response = self.llm.invoke(messages)
-            return llm_response.content
+            if cache_key in self.response_cache:
+                return self.response_cache[cache_key]
+
+            prompt = f"""
+            Please format these bond calculation results into a clear response:
+            {json.dumps(response.__dict__, default=str, indent=2)}
+            
+            Current Date: {self.current_date}
+            Current User: {self.current_user}
+            
+            Include:
+            1. Bond details (ISIN, issuer, etc.)
+            2. Calculation type and inputs
+            3. Results with explanations
+            4. Any relevant notes or warnings
+            """
+            
+            try:
+                formatted_response = self._get_llm_response(prompt)
+                self.response_cache[cache_key] = formatted_response
+                return formatted_response
+            except Exception as e:
+                logger.warning(f"Error getting LLM response: {str(e)}. Falling back to basic formatting.")
+                return self._basic_format_response(response)
 
         except Exception as e:
-            logger.error(f"Error formatting response: {str(e)}")
-            # Fallback to basic formatting
-            if not response.success:
-                return f"Error: {response.message}"
+            logger.error(f"Error in format_response: {str(e)}")
+            return self._basic_format_response(response)
 
-            output = []
-            output.append(f"\nBond Calculation Results (as of {self.current_date})")
-            output.append("=" * 50)
-            
-            # Bond details
-            output.append("Bond Details:")
-            output.append(f"ISIN: {response.bond_details.get('isin', 'N/A')}")
-            output.append(f"Issuer: {response.bond_details.get('issuer_name', 'N/A')}")
-            
-            # Calculation results
-            output.append("\nCalculation Results:")
-            output.append(f"Type: {response.calculation_type.title()}")
-            
-            results = response.results
-            for key, value in results.items():
-                if isinstance(value, (int, float)):
-                    if 'price' in key:
-                        output.append(f"{key.replace('_', ' ').title()}: ₹{value:,.2f}")
-                    elif 'rate' in key or 'yield' in key:
-                        output.append(f"{key.replace('_', ' ').title()}: {value:.2f}%")
-                    else:
-                        output.append(f"{key.replace('_', ' ').title()}: {value}")
+    def _basic_format_response(self, response: BondCalculationResponse) -> str:
+        """Basic formatting fallback when LLM is unavailable"""
+        if not response.success:
+            return f"Error: {response.message}"
+
+        output = []
+        output.append(f"\nBond Calculation Results (as of {self.current_date})")
+        output.append("=" * 50)
+        
+        # Bond details
+        output.append("Bond Details:")
+        output.append(f"ISIN: {response.bond_details.get('isin', 'N/A')}")
+        output.append(f"Issuer: {response.bond_details.get('issuer_name', 'N/A')}")
+        output.append(f"Face Value: ₹{response.bond_details.get('face_value', 'N/A')}")
+        output.append(f"Coupon Rate: {response.bond_details.get('coupon_rate', 'N/A')}")
+        output.append(f"Maturity Date: {response.bond_details.get('maturity_date', 'N/A')}")
+        
+        # Calculation results
+        output.append("\nCalculation Results:")
+        output.append(f"Type: {response.calculation_type.title()}")
+        
+        results = response.results
+        for key, value in results.items():
+            if isinstance(value, (int, float)):
+                if 'price' in key:
+                    output.append(f"{key.replace('_', ' ').title()}: ₹{value:,.2f}")
+                elif 'rate' in key or 'yield' in key:
+                    output.append(f"{key.replace('_', ' ').title()}: {value:.2f}%")
                 else:
                     output.append(f"{key.replace('_', ' ').title()}: {value}")
+            else:
+                output.append(f"{key.replace('_', ' ').title()}: {value}")
 
-            return "\n".join(output)
+        return "\n".join(output)
 
     def process_calculation_request(self, query: Dict[str, Any]) -> str:
         """
@@ -444,23 +420,25 @@ def calculate_yield(self, request: BondCalculationRequest) -> BondCalculationRes
         """
         logger.info("Processing bond calculation request")
         
-        # Validate the request
-        is_valid, error_message, calculation_request = self.validate_calculation_request(query)
-        
-        if not is_valid:
-            return f"Invalid calculation request: {error_message}"
+        try:
+            # Validate the request
+            is_valid, error_message, calculation_request = self.validate_calculation_request(query)
             
-        # Perform calculation
-        if calculation_request.calculation_type == "price":
-            response = self.calculate_price(calculation_request)
-        else:
-            response = self.calculate_yield(calculation_request)
+            if not is_valid:
+                return f"Invalid calculation request: {error_message}"
+                
+            # Perform calculation
+            if calculation_request.calculation_type == "price":
+                response = self.calculate_price(calculation_request)
+            else:
+                response = self.calculate_yield(calculation_request)
+                
+            # Format and return response
+            return self.format_response(response)
             
-        # Format and return response
-        return self.format_response(response)
-
-# ... [Rest of the code remains the same] ...
-
+        except Exception as e:
+            logger.error(f"Error processing calculation request: {str(e)}")
+            return f"Error processing calculation request: {str(e)}"
 if __name__ == "__main__":
     # Set up logging
     logging.basicConfig(
