@@ -29,7 +29,6 @@ def init_gptcache(cache_obj: Cache, llm: str):
     )
 
 
-# Initialize GPT Cache
 set_llm_cache(GPTCache(init_gptcache))
 
 load_dotenv()
@@ -156,17 +155,16 @@ class BondWorkflowChain:
         """
         workflow = BondWorkflowChain()
         result = workflow.process_query(user_query)
+        web_result = WebAgent().get_info(user_query)
+
+        joiner_prompt = f"Structure the following two responses: \n\n1. {result} \n\n2. {web_result}"
+        print("\nIntermediate Result:", result)
         messages = [
-            ("system", "check if the result is complete or not, if it is not complete then tell no else tell yes, final response will be 'yes' or 'no'"),
-            ("human", f"User query : {user_query} \n {result}")
+            ("system", "Generate a well-structured, coherent, and contextually accurate response based on the provided query. Ensure clarity, completeness, and logical flow while maintaining a professional and polished tone."),
+            ("human", f"User query : {joiner_prompt}")
         ]
         answer = self.llm.invoke(messages)
-        if answer == 'yes':
-            return result
-        else:
-            result = WebAgent().get_info(user_query)
-
-        return result
+        return answer.content
 
 
 if __name__ == "__main__":

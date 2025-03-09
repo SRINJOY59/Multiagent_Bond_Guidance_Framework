@@ -2,7 +2,6 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import Any
 
-# Import the BondWorkflowChain class from the existing script
 from workflow import BondWorkflowChain
 
 app = FastAPI()
@@ -13,7 +12,6 @@ class QueryRequest(BaseModel):
 class QueryResponse(BaseModel):
     response: str
 
-# Initialize the BondWorkflowChain instance
 workflow_chain = BondWorkflowChain()
 
 @app.post("/process_query", response_model=QueryResponse)
