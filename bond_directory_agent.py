@@ -10,7 +10,7 @@ class BondQueryResponse(BaseModel):
     binary_score: int = Field(..., description="1 for Bond Finder Agent, 0 for Cash Flow & Maturity Agent")
 
 class BondDirectoryAgent:
-    def __init__(self, model):
+    def __init__(self, model = "llama3-70b-8192"):
         """
         Initializes the BondQueryRouter with a language model and API key.
         """
@@ -78,10 +78,9 @@ class BondDirectoryAgent:
 
 
 if __name__ == "__main__":
-    model = "llama3-70b-8192"
 
 
-    router = BondDirectoryAgent(model)
+    router = BondDirectoryAgent()
 
     # Sample Query
     query = "Show me details for ISIN INE 123456789."
