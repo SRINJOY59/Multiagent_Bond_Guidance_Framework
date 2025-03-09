@@ -1,5 +1,0 @@
-python-dotenv
-langchain
-langchain_groq
-langchain_huggingface
-langchain_community
