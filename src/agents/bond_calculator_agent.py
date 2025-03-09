@@ -270,88 +270,103 @@ class BondCalculatorAgent:
                 bond_details=request.bond_data
             )
 
-    def calculate_yield(self, request: BondCalculationRequest) -> BondCalculationResponse:
-        """Calculate yield to maturity given price"""
-        try:
-            # Extract bond details
-            face_value = float(request.bond_data['face_value'].replace('₹', '').replace(',', ''))
-            coupon_rate = float(request.bond_data['coupon_rate'].replace('%', '')) / 100
-            maturity_date = datetime.datetime.strptime(request.bond_data['maturity_date'], '%d-%m-%Y')
+def calculate_yield(self, request: BondCalculationRequest) -> BondCalculationResponse:
+    """Calculate yield to maturity given price using binary search method"""
+    try:
+        # Extract bond details
+        face_value = float(request.bond_data['face_value'].replace('₹', '').replace(',', ''))
+        coupon_rate = float(request.bond_data['coupon_rate'].replace('%', '')) / 100
+        maturity_date = datetime.datetime.strptime(request.bond_data['maturity_date'], '%d-%m-%Y')
+        
+        # Calculate time to maturity in years
+        time_to_maturity = (maturity_date - request.investment_date).days / self.days_in_year
+        
+        if time_to_maturity <= 0:
+            raise ValueError("Bond has matured")
             
-            # Initial yield guess (use coupon rate as starting point)
-            yield_guess = coupon_rate * 100
-            tolerance = 0.0001
-            max_iterations = 100
+        # Calculate annual coupon payment
+        annual_coupon = face_value * coupon_rate
+        semi_annual_coupon = annual_coupon / self.payment_frequency
+        
+        # Calculate accrued interest
+        days_since_last_coupon = (request.investment_date - maturity_date).days % (365//self.payment_frequency)
+        accrued_interest = (annual_coupon * days_since_last_coupon) / self.days_in_year
+        
+        # Target dirty price
+        dirty_price = request.input_value + accrued_interest
+        
+        # Binary search parameters
+        lower_yield = 0.0001  # 0.01%
+        upper_yield = 1.0     # 100%
+        tolerance = 0.0001
+        max_iterations = 50
+        
+        def calculate_price_at_yield(ytm):
+            """Helper function to calculate price at a given yield"""
+            price = 0
+            periods = int(time_to_maturity * self.payment_frequency)
             
-            # Calculate accrued interest
-            days_since_last_coupon = (request.investment_date - maturity_date).days % (365//self.payment_frequency)
-            annual_coupon = face_value * coupon_rate
-            accrued_interest = (annual_coupon * days_since_last_coupon) / self.days_in_year
+            for i in range(1, periods + 1):
+                time_to_payment = i / self.payment_frequency
+                discount_factor = 1 / ((1 + ytm) ** time_to_payment)
+                
+                if i == periods:
+                    # Last payment includes face value
+                    payment = semi_annual_coupon + face_value
+                else:
+                    payment = semi_annual_coupon
+                    
+                price += payment * discount_factor
             
-            # Target dirty price
-            dirty_price = request.input_value + accrued_interest
+            return price
             
-            # Newton-Raphson method to find yield
-            for _ in range(max_iterations):
-                # Calculate price at current yield guess
-                price_calc_request = BondCalculationRequest(
-                    isin=request.isin,
-                    calculation_type="price",
-                    investment_date=request.investment_date,
-                    units=request.units,
-                    input_value=yield_guess,
-                    bond_data=request.bond_data
+        # Binary search for yield
+        for _ in range(max_iterations):
+            current_yield = (lower_yield + upper_yield) / 2
+            calculated_price = calculate_price_at_yield(current_yield)
+            
+            if abs(calculated_price - dirty_price) < tolerance:
+                # Found the yield
+                ytm = current_yield * 100  # Convert to percentage
+                
+                results = {
+                    "yield_to_maturity": ytm,
+                    "clean_price_per_unit": request.input_value,
+                    "clean_price_total": request.input_value * request.units,
+                    "dirty_price_per_unit": dirty_price,
+                    "dirty_price_total": dirty_price * request.units,
+                    "accrued_interest": accrued_interest,
+                    "time_to_maturity": time_to_maturity,
+                    "annual_coupon": annual_coupon,
+                    "units": request.units,
+                    "investment_date": request.investment_date.strftime('%Y-%m-%d %H:%M:%S'),
+                    "calculation_date": self.current_date.strftime('%Y-%m-%d %H:%M:%S')
+                }
+                
+                return BondCalculationResponse(
+                    success=True,
+                    message="Yield calculation successful",
+                    calculation_type="yield",
+                    results=results,
+                    bond_details=request.bond_data
                 )
+            
+            if calculated_price > dirty_price:
+                lower_yield = current_yield
+            else:
+                upper_yield = current_yield
                 
-                price_result = self.calculate_price(price_calc_request)
-                if not price_result.success:
-                    raise ValueError(price_result.message)
-                
-                price_guess = price_result.results["dirty_price_per_unit"]
-                
-                if abs(price_guess - dirty_price) < tolerance:
-                    results = {
-                        "yield_to_maturity": yield_guess,
-                        "clean_price_per_unit": request.input_value,
-                        "clean_price_total": request.input_value * request.units,
-                        "dirty_price_per_unit": dirty_price,
-                        "dirty_price_total": dirty_price * request.units,
-                        "accrued_interest": accrued_interest,
-                        "units": request.units,
-                        "investment_date": request.investment_date.strftime('%Y-%m-%d %H:%M:%S'),
-                        "calculation_date": self.current_date.strftime('%Y-%m-%d %H:%M:%S')
-                    }
-
-                    return BondCalculationResponse(
-                        success=True,
-                        message="Yield calculation successful",
-                        calculation_type="yield",
-                        results=results,
-                        bond_details=request.bond_data
-                    )
-
-                # Calculate derivative for Newton-Raphson
-                delta = 0.0001
-                price_calc_request.input_value = yield_guess + delta
-                price_plus_delta = self.calculate_price(price_calc_request).results["dirty_price_per_unit"]
-                
-                derivative = (price_plus_delta - price_guess) / delta
-                yield_guess = yield_guess - (price_guess - dirty_price) / derivative
-                
-                if yield_guess < 0:
-                    yield_guess = 0
-
-            raise ValueError("Yield calculation did not converge")
-
-        except Exception as e:
-            logger.error(f"Error in yield calculation: {str(e)}")
-            return BondCalculationResponse(
-                success=False,
-                message=f"Error calculating yield: {str(e)}",
-                calculation_type="yield",
-                results={},
-                bond_details=request.bond_data
-            )
+        raise ValueError("Yield calculation did not converge within tolerance")
+        
+    except Exception as e:
+        logger.error(f"Error in yield calculation: {str(e)}")
+        return BondCalculationResponse(
+            success=False,
+            message=f"Error calculating yield: {str(e)}",
+            calculation_type="yield",
+            results={},
+            bond_details=request.bond_data
+        )
 
     def format_response(self, response: BondCalculationResponse) -> str:
         """Format calculation response using LLM for natural language explanation"""
