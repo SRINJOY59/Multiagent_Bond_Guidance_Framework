@@ -8,6 +8,29 @@ from websearch import WebAgent
 from dotenv import load_dotenv
 from langchain_groq import ChatGroq
 
+from langchain.globals import set_llm_cache
+import hashlib
+from gptcache import Cache
+from gptcache.manager.factory import manager_factory
+from gptcache.processor.pre import get_prompt
+from langchain_community.cache import GPTCache
+
+
+load_dotenv()
+def get_hashed_name(name):
+    """Generate a hashed name for the LLM model to use in cache storage."""
+    return hashlib.sha256(name.encode()).hexdigest()
+def init_gptcache(cache_obj: Cache, llm: str):
+    """Initialize the GPTCache system."""
+    hashed_llm = get_hashed_name(llm)
+    cache_obj.init(
+        pre_embedding_func=get_prompt,
+        data_manager=manager_factory(manager="map", data_dir=f"map_cache_{hashed_llm}"),
+    )
+
+
+set_llm_cache(GPTCache(init_gptcache))
+
 load_dotenv()
 
 class BondWorkflowChain:
@@ -34,7 +57,7 @@ class BondWorkflowChain:
         routing_result = self.router.route_query(user_query)
         print(f"Router result: {routing_result}")
         
-        if self._should_route_to_directory(routing_result):
+        if self._should_route_to_directory(routing_result) == 0:
             directory_result = self.directory.route_query(user_query)
             print(f"Directory result: {directory_result}")
             
@@ -70,7 +93,7 @@ class BondWorkflowChain:
         else:
             result_str = str(result)
         
-        print(f"Screener result: {result_str[:100]}...")  # Print first 100 chars
+        print(f"Screener result: {result_str}...")  # Print first 100 chars
         return result_str
     
     def _process_with_cashflow(self, query):
@@ -83,7 +106,7 @@ class BondWorkflowChain:
         else:
             result_str = str(result)
         
-        print(f"Cashflow result: {result_str[:100]}...")  # Print first 100 chars
+        print(f"Cashflow result: {result_str}...")  # Print first 100 chars
         return result_str
     
     def _process_with_finder(self, query):
@@ -132,21 +155,20 @@ class BondWorkflowChain:
         """
         workflow = BondWorkflowChain()
         result = workflow.process_query(user_query)
+        web_result = WebAgent().get_info(user_query)
+
+        joiner_prompt = f"Structure the following two responses: \n\n1. {result} \n\n2. {web_result}"
+        print("\nIntermediate Result:", result)
         messages = [
-            ("system", "check if the result is complete or not, if it is not complete then tell no else tell yes, final response will be 'yes' or 'no'"),
-            ("human", f"User query : {user_query} \n {result}")
+            ("system", "Generate a well-structured, coherent, and contextually accurate response based on the provided query. Ensure clarity, completeness, and logical flow while maintaining a professional and polished tone."),
+            ("human", f"User query : {joiner_prompt}")
         ]
         answer = self.llm.invoke(messages)
-        if answer == 'yes':
-            return result
-        else:
-            result = WebAgent().get_info(user_query)
-
-        return result
+        return answer.content
 
 
 if __name__ == "__main__":
-    user_query = "Which platform has the best yield for 5-year bonds?"
+    user_query = "Give an overview of the financial analysis of Urgo Capital Limited"
     workflow = BondWorkflowChain()
     result = workflow.run_bond_workflow(user_query)
     print("\nFinal Response:")
