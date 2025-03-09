@@ -63,5 +63,5 @@ class BondScreeneragent:
 
 if __name__ == "__main__":
     agent = BondScreeneragent()
-    result = agent.query("Give an overview of the financial analysis of Navi-finserv Limited.")
+    result = agent.query("Give an overview of the financial analysis of Urgo Capital Limited.")
     print(result)
