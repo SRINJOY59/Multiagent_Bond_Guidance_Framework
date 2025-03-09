@@ -50,7 +50,7 @@ class BondFinderAgent:
     def __init__(self, 
                  llm_model_name: str = "llama3-70b-8192", 
                  api_key: Optional[str] = None,
-                 csv_path: str = "bonds_details_202503011115.csv",
+                 csv_path: str = "../../data/bonds_details_202503011115.csv",
                  fuzzy_threshold: int = 80):  # Threshold for fuzzy matching (0-100)
         """
         Initialize the Bond Query Processor.
