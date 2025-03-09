@@ -388,27 +388,64 @@ class BondCalculatorAgent:
 # ... [Rest of the code remains the same] ...
 
 if __name__ == "__main__":
-    # Example usage with current date and user
-    calculator = BondCalculatorAgent(
-        current_date="2025-03-09 21:16:51",
-        current_user="codegeek03"
+    # Set up logging
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     )
-    
-    # Example calculation request
-    sample_request = {
-        "isin": "INE002A08534",
-        "calculation_type": "price",
-        "investment_date": "2025-03-09 21:16:51",
-        "units": 100,
-        "input_value": 8.5,  # yield rate for price calculation
-        "bond_data": {
+
+    # Current date and user configuration
+    CURRENT_DATE = "2025-03-09 21:21:31"
+    CURRENT_USER = "codegeek03"
+
+    try:
+        # Initialize the calculator
+        calculator = BondCalculatorAgent(
+            current_date=CURRENT_DATE,
+            current_user=CURRENT_USER
+        )
+        
+        # Example price calculation
+        price_request = {
             "isin": "INE002A08534",
-            "issuer_name": "RELIANCE INDUSTRIES LIMITED",
-            "face_value": "1000000",
-            "coupon_rate": "9.05%",
-            "maturity_date": "17-10-2028"
+            "calculation_type": "price",
+            "investment_date": CURRENT_DATE,
+            "units": 100,
+            "input_value": 8.5,  # yield rate
+            "bond_data": {
+                "isin": "INE002A08534",
+                "issuer_name": "RELIANCE INDUSTRIES LIMITED",
+                "face_value": "1000000",
+                "coupon_rate": "9.05%",
+                "maturity_date": "17-10-2028"
+            }
         }
-    }
-    
-    result = calculator.process_calculation_request(sample_request)
-    print(result)
+        
+        print("\nCalculating Bond Price:")
+        print("=" * 50)
+        result = calculator.process_calculation_request(price_request)
+        print(result)
+        
+        # Example yield calculation
+        yield_request = {
+            "isin": "INE002A08534",
+            "calculation_type": "yield",
+            "investment_date": CURRENT_DATE,
+            "units": 100,
+            "input_value": 1050000,  # price
+            "bond_data": {
+                "isin": "INE002A08534",
+                "issuer_name": "RELIANCE INDUSTRIES LIMITED",
+                "face_value": "1000000",
+                "coupon_rate": "9.05%",
+                "maturity_date": "17-10-2028"
+            }
+        }
+        
+        print("\nCalculating Bond Yield:")
+        print("=" * 50)
+        result = calculator.process_calculation_request(yield_request)
+        print(result)
+
+    except Exception as e:
+        logging.error(f"Error in main execution: {str(e)}")
