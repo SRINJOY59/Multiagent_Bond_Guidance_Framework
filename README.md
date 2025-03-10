@@ -1,95 +1,173 @@
+
 # Multiagent Bond Guidance Framework
 
-<p align="center">
-  <img src="tapbondlogo.png" alt="Framework Logo" width="200"/>
-</p>
+[![Python](https://img.shields.io/badge/Python-3.9%2B-blue)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.100.0-green)](https://fastapi.tiangolo.com/)
+[![Jupyter](https://img.shields.io/badge/Jupyter-Notebooks-orange)](https://jupyter.org/)
+
 
 ## Overview
 
-The Multiagent Bond Guidance Framework is a Python-based solution for implementing and managing multi-agent systems in the context of bond guidance and financial decision-making. This framework provides tools and utilities for developing autonomous agents that can collaborate and make decisions in bond market scenarios.
+The Multiagent Bond Guidance Framework is an AI-powered layer built for the Tap Bonds platform, designed to enhance bond discovery and research capabilities. This framework integrates multiple specialized agents to provide comprehensive bond analysis and guidance.
+
+## Architecture
 
 
 <img width="460" alt="image" src="https://github.com/user-attachments/assets/0f3006f9-29ff-4404-8efb-9dc0589f5960" />
 
+### 1. Orchestrator Agent (Main Agent)
+- Central coordination of user queries
+- Intelligent routing to specialized agents
+- Response aggregation and formatting
 
-## Project Structure
+### 2. Specialized Agents
 
-```
-├── app/            # Application-specific code and entry points
-├── data/           # Data files and resources
-├── src/            # Source code for the core framework
-├── .env            # Environment configuration
-└── README.md       # Project documentation
+#### Bond Directory Agent
+- ISIN-level bond information
+- Credit ratings lookup
+- Maturity and security type details
+
+#### Bond Finder Agent
+- Cross-platform bond comparison
+- Yield optimization
+- Investment opportunity analysis
+
+#### Cash Flow & Maturity Agent
+- Bond cash flow analysis
+- Maturity schedule tracking
+- Payment timeline management
+
+#### Bond Calculator Agent
+- Price calculation from yield rates
+- Yield calculation from prices
+- Advanced financial metrics computation
+
+### API Implementation
+
+The framework exposes a RESTful API built with FastAPI:
+
+```python
+POST /calculate
+{
+    "isin": "INE002A08534",
+    "calculation_type": "price",
+    "investment_date": "2025-03-09 21:58:59",
+    "units": 100,
+    "input_value": 8.5,
+    "bond_data": {
+        "isin": "INE002A08534",
+        "issuer_name": "RELIANCE INDUSTRIES LIMITED",
+        "face_value": "1000000",
+        "coupon_rate": "9.05%",
+        "maturity_date": "17-10-2028"
+    }
+}
 ```
 
 ## Features
 
-- Multi-agent system architecture for bond market analysis
-- Collaborative decision-making algorithms
-- Bond guidance and financial modeling tools
-- Configurable environment settings
-- Data management and analysis capabilities
+### Bond Calculator
+- Price/Yield calculations
+- Cash flow analysis
+- Accrued interest computation
+- Semi-annual coupon handling
 
-## Requirements
+### Bond Discovery
+- Comprehensive ISIN database
+- Multi-platform yield comparison
+- Investment opportunity identification
 
-- Python 3.7+
-- Required Python packages (install via pip):
-  ```bash
-  # Core dependencies will be listed in requirements.txt
-  pip install -r requirements.txt
-  ```
+### Financial Analysis
+- Issuer creditworthiness assessment
+- Financial stability metrics
+- Company-level analysis
 
-## Installation
+## Repository Structure
+
+```
+├── agents/                 # Agent implementations
+│   ├── orchestrator.py    # Main orchestrator agent
+│   ├── directory.py       # Bond directory agent
+│   ├── finder.py         # Bond finder agent
+│   ├── calculator.py     # Bond calculator agent
+│   └── cashflow.py       # Cash flow agent
+├── api/                   # API implementation
+│   └── app.py           # FastAPI application
+├── notebooks/            # Jupyter notebooks for analysis
+├── tests/               # Test suite
+└── requirements.txt     # Project dependencies
+```
+
+## Tech Stack
+
+- **Python**: Core implementation
+- **FastAPI**: API framework
+- **Jupyter**: Analysis and documentation
+- **LangChain**: Agent orchestration
+- **Groq**: LLM integration
+
+## Getting Started
 
 1. Clone the repository:
-   ```bash
-   git clone https://github.com/SRINJOY59/Multiagent_Bond_Guidance_Framework.git
-   cd Multiagent_Bond_Guidance_Framework
-   ```
+```bash
+git clone https://github.com/SRINJOY59/Multiagent_Bond_Guidance_Framework.git
+cd Multiagent_Bond_Guidance_Framework
+```
 
-2. Set up a virtual environment (recommended):
-   ```bash
-   python -m venv venv
-   source venv/bin/activate  # On Windows, use: venv\Scripts\activate
-   ```
+2. Install dependencies:
+```bash
+pip install -r requirements.txt
+```
 
+3. Set up environment variables:
+```bash
+export GROQ_API_KEY="your_api_key"
+```
 
+4. Run the API:
+```bash
+uvicorn api.app:app --reload
+```
 
-4. Configure the environment:
-   - Copy the `.env.example` file to `.env` (if provided)
-   - Update the configuration values as needed
+## Usage Examples
 
+### Bond Price Calculation
+```python
+from agents.calculator import BondCalculatorAgent
 
-   ```
+calculator = BondCalculatorAgent()
+result = calculator.calculate_price(bond_request)
+print(result)
+```
 
-## Documentation
+### Bond Discovery
+```python
+from agents.finder import BondFinderAgent
 
-Detailed documentation for the framework can be found in the following locations:
-- `/app` - Application usage examples and implementations
-- `/src` - Core framework documentation and API reference
-- `/data` - Data format specifications and examples
+finder = BondFinderAgent()
+bonds = finder.search_bonds(criteria)
+print(bonds)
+```
 
 ## Contributing
 
-Contributions to the Multiagent Bond Guidance Framework are welcome! Please follow these steps:
-
 1. Fork the repository
-2. Create a new branch (`git checkout -b feature/improvement`)
-3. Make your changes
-4. Commit your changes (`git commit -am 'Add new feature'`)
-5. Push to the branch (`git push origin feature/improvement`)
-6. Create a Pull Request
+2. Create a feature branch
+3. Commit your changes
+4. Push to the branch
+5. Open a Pull Request
 
 ## License
 
-This project is licensed under an appropriate open-source license - see the LICENSE file for details.
+This project is licensed under the MIT License - see the LICENSE file for details.
 
-## Contact
+## Acknowledgments
 
-For questions, suggestions, or collaboration opportunities, please:
-- Create an issue in the GitHub repository
-- Contact the repository owner: [@SRINJOY59](https://github.com/SRINJOY59)
+- TapBonds.com for the platform and data
+- Hackathon organizers and mentors
+- All contributors and participants
 
----
+## Current Status
 
-⭐ If you find this framework useful, please consider giving it a star!
+Last Updated: 2025-03-10 20:54:46 UTC
+Maintainer: @codegeek03
