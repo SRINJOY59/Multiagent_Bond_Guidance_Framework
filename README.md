@@ -13,7 +13,7 @@ The Multiagent Bond Guidance Framework is an AI-powered layer built for the Tap 
 ## Architecture
 
 
-<img width="460" alt="image" src="https://github.com/user-attachments/assets/0f3006f9-29ff-4404-8efb-9dc0589f5960" />
+<img width="460" alt="image" src="https://github.com/user-attachments/assets/0f3006f9-29ff-4404-8efb-9dc0589f5960" align="center"/>
 
 ### 1. Orchestrator Agent (Main Agent)
 - Central coordination of user queries
