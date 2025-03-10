@@ -1,8 +1,13 @@
+import os
+import sys
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import Any
 
-from Multiagent_Bond_Guidance_Framework.src.workflow import BondWorkflowChain
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+
+from src.workflow import BondWorkflowChain
 
 app = FastAPI()
 

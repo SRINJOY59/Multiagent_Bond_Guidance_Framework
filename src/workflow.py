@@ -1,3 +1,7 @@
+import os
+import sys
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
 from agents.orchestratoragent import BondQueryRouter
 from agents.bond_directory_agent import BondDirectoryAgent
 from agents.bond_screener_agent import BondScreeneragent
@@ -14,6 +18,8 @@ from gptcache import Cache
 from gptcache.manager.factory import manager_factory
 from gptcache.processor.pre import get_prompt
 from langchain_community.cache import GPTCache
+
+
 
 
 load_dotenv()
