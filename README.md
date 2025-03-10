@@ -49,34 +49,13 @@ The Multiagent Bond Guidance Framework is a Python-based solution for implementi
    source venv/bin/activate  # On Windows, use: venv\Scripts\activate
    ```
 
-3. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
+
 
 4. Configure the environment:
    - Copy the `.env.example` file to `.env` (if provided)
    - Update the configuration values as needed
 
-## Usage
 
-1. Initialize the framework:
-   ```python
-   from src.framework import BondGuidanceFramework
-   
-   framework = BondGuidanceFramework()
-   ```
-
-2. Configure your agents:
-   ```python
-   framework.add_agent("agent1", strategy="conservative")
-   framework.add_agent("agent2", strategy="aggressive")
-   ```
-
-3. Run simulations or analysis:
-   ```python
-   framework.run_simulation(duration="1d")
-   results = framework.get_results()
    ```
 
 ## Documentation
