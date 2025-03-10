@@ -8,6 +8,10 @@
 
 The Multiagent Bond Guidance Framework is a Python-based solution for implementing and managing multi-agent systems in the context of bond guidance and financial decision-making. This framework provides tools and utilities for developing autonomous agents that can collaborate and make decisions in bond market scenarios.
 
+
+<img width="460" alt="image" src="https://github.com/user-attachments/assets/0f3006f9-29ff-4404-8efb-9dc0589f5960" />
+
+
 ## Project Structure
 
 ```
@@ -49,34 +53,13 @@ The Multiagent Bond Guidance Framework is a Python-based solution for implementi
    source venv/bin/activate  # On Windows, use: venv\Scripts\activate
    ```
 
-3. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
+
 
 4. Configure the environment:
    - Copy the `.env.example` file to `.env` (if provided)
    - Update the configuration values as needed
 
-## Usage
 
-1. Initialize the framework:
-   ```python
-   from src.framework import BondGuidanceFramework
-   
-   framework = BondGuidanceFramework()
-   ```
-
-2. Configure your agents:
-   ```python
-   framework.add_agent("agent1", strategy="conservative")
-   framework.add_agent("agent2", strategy="aggressive")
-   ```
-
-3. Run simulations or analysis:
-   ```python
-   framework.run_simulation(duration="1d")
-   results = framework.get_results()
    ```
 
 ## Documentation

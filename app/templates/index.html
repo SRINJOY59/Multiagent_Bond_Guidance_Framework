@@ -42,10 +42,6 @@
             margin-right: 10px;
         }
 
-        .logo span {
-            color: #66a3ff;
-        }
-
         .platform-name {
             font-size: 28px;
             font-weight: bold;
@@ -87,6 +83,7 @@
             position: relative;
             overflow: hidden;
             border: 1px solid rgba(0, 85, 170, 0.1);
+            cursor: pointer;
         }
 
         .agent-box:hover {
@@ -270,6 +267,146 @@
             color: #0055aa;
         }
 
+        /* Loading indicator */
+        .loading-dots {
+            display: inline-flex;
+            align-items: center;
+            height: 20px;
+        }
+
+        .loading-dots span {
+            width: 8px;
+            height: 8px;
+            margin: 0 3px;
+            background-color: #0055aa;
+            border-radius: 50%;
+            display: inline-block;
+            animation: bounce 1.4s infinite ease-in-out both;
+        }
+
+        .loading-dots span:nth-child(1) {
+            animation-delay: -0.32s;
+        }
+
+        .loading-dots span:nth-child(2) {
+            animation-delay: -0.16s;
+        }
+
+        @keyframes bounce {
+            0%, 80%, 100% { 
+                transform: scale(0);
+            } 40% { 
+                transform: scale(1.0);
+            }
+        }
+
+        .loading-message {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* Calculator form */
+        .calculator-form {
+            display: none;
+            padding: 1.5rem;
+            background-color: #f8faff;
+            border-radius: 12px;
+            margin: 1rem;
+            border: 1px solid #66a3ff;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            position: relative;
+        }
+
+        .calculator-form h3 {
+            color: #0055aa;
+            margin-bottom: 1.2rem;
+            text-align: center;
+            font-size: 1.3rem;
+        }
+
+        .calculator-form.active {
+            display: block;
+            animation: slideDown 0.3s ease-out;
+        }
+
+        @keyframes slideDown {
+            from { 
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to { 
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .form-group {
+            margin-bottom: 1.2rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #0055aa;
+            font-weight: bold;
+        }
+
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 0.8rem;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+
+        .form-group input:focus, .form-group select:focus {
+            border-color: #0055aa;
+            box-shadow: 0 0 0 2px rgba(0, 85, 170, 0.1);
+            outline: none;
+        }
+
+        .calculator-buttons {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 1.5rem;
+        }
+
+        .calculate-btn {
+            background: linear-gradient(45deg, #0055aa, #66a3ff);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 0.8rem 1.5rem;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s;
+            flex-grow: 1;
+            margin-left: 0.5rem;
+        }
+
+        .cancel-btn {
+            background: #f0f0f0;
+            color: #555;
+            border: none;
+            border-radius: 8px;
+            padding: 0.8rem 1.5rem;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s;
+            width: 120px;
+        }
+
+        .calculate-btn:hover {
+            box-shadow: 0 4px 12px rgba(0, 85, 170, 0.3);
+            transform: translateY(-2px);
+        }
+
+        .cancel-btn:hover {
+            background: #e0e0e0;
+        }
+
         /* Ensure full height on all viewports */
         @media (max-height: 800px) {
             .agent-description {
@@ -311,21 +448,115 @@
                 overflow-y: auto;
             }
         }
+
+        /* Toggle button for calculator */
+        .calculator-toggle {
+            background: #0055aa;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 0.7rem 1.2rem;
+            margin-left: auto;
+            font-size: 15px;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-weight: 600;
+        }
+
+        .calculator-toggle:hover {
+            background: #003c7a;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 85, 170, 0.2);
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .heading {
+            font-size: 24px;
+            font-weight: bold;
+            color: #0055aa;
+        }
+
+        .calc-icon {
+            font-size: 18px;
+        }
+
+        .help-text {
+            color: #666;
+            font-size: 0.8rem;
+            margin-top: 0.3rem;
+            font-style: italic;
+        }
+
+        /* Result display */
+        .calculation-result {
+            margin-top: 1rem;
+            padding: 1rem;
+            background-color: #e7f1ff;
+            border-radius: 8px;
+            border-left: 4px solid #0055aa;
+            display: none;
+        }
+
+        .calculation-result.active {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .result-title {
+            font-weight: bold;
+            color: #0055aa;
+            margin-bottom: 0.5rem;
+        }
+
+        .result-value {
+            font-size: 1.2rem;
+        }
+
+        /* Close button for calculator */
+        .close-calculator {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            background: none;
+            border: none;
+            color: #888;
+            font-size: 20px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .close-calculator:hover {
+            color: #0055aa;
+            transform: scale(1.1);
+        }
     </style>
 </head>
 <body>
-    
     <header class="header">
         <div class="logo-container">
             <img src="tapbondlogo.png" alt="Tap Bonds Logo" class="logo" style="width: 110px;height: 50px;">
         </div>
-        <div class="heading">ChatBond.ai</div>
+        <div class="header-right">
+            <div class="heading">ChatBond.ai</div>
+            <button class="calculator-toggle" id="calculatorToggle">
+                <span>Bond Calculator</span>
+                <span class="calc-icon">🧮</span>
+            </button>
+        </div>
     </header>
 
     <div class="main-container">
         <div class="agents-container">
             <div class="agents-grid">
-                <div class="agent-box">
+                <div class="agent-box" data-agent="directory">
                     <div class="icon-container">
                         <i class="agent-small-icon">📂</i>
                     </div>
@@ -334,7 +565,7 @@
                     <div class="agent-icon">📂</div>
                 </div>
                 
-                <div class="agent-box">
+                <div class="agent-box" data-agent="finder">
                     <div class="icon-container">
                         <i class="agent-small-icon">🔍</i>
                     </div>
@@ -343,7 +574,7 @@
                     <div class="agent-icon">🔍</div>
                 </div>
                 
-                <div class="agent-box">
+                <div class="agent-box" data-agent="cashflow">
                     <div class="icon-container">
                         <i class="agent-small-icon">💰</i>
                     </div>
@@ -352,7 +583,7 @@
                     <div class="agent-icon">💰</div>
                 </div>
                 
-                <div class="agent-box">
+                <div class="agent-box" data-agent="screener">
                     <div class="icon-container">
                         <i class="agent-small-icon">📊</i>
                     </div>
@@ -364,6 +595,24 @@
         </div>
         
         <div class="chatbot-container">
+            <div class="calculator-form" id="calculatorForm">
+                <button class="close-calculator" id="closeCalculator">&times;</button>
+                <h3>Bond Yield Calculator</h3>
+                <div class="form-group">
+                    <label for="isin">ISIN</label>
+                    <input type="text" id="isin" placeholder="Enter bond ISIN" autocomplete="off">
+                    <p class="help-text">Example: US912810TD00, DE0001102580</p>
+                </div>
+                <div class="calculator-buttons">
+                    <button class="cancel-btn" id="cancelCalculation">Cancel</button>
+                    <button class="calculate-btn" id="submitCalculation">Calculate Yield</button>
+                </div>
+                <div class="calculation-result" id="calculationResult">
+                    <div class="result-title">Bond Yield:</div>
+                    <div class="result-value" id="resultValue">--</div>
+                </div>
+            </div>
+            
             <div class="chat-messages" id="chatMessages">
                 <div class="message bot-message">
                     Welcome to ChatBond.ai! I can help you find information about bonds, compare yields, analyze cash flows, and screen potential investments. What would you like to know today?
@@ -383,7 +632,118 @@
             const sendButton = document.getElementById('sendButton');
             const chatMessages = document.getElementById('chatMessages');
             const agentBoxes = document.querySelectorAll('.agent-box');
-
+            const calculatorToggle = document.getElementById('calculatorToggle');
+            const calculatorForm = document.getElementById('calculatorForm');
+            const calculationResult = document.getElementById('calculationResult');
+            const resultValue = document.getElementById('resultValue');
+            const cancelCalculation = document.getElementById('cancelCalculation');
+            const closeCalculator = document.getElementById('closeCalculator');
+            const submitCalculation = document.getElementById('submitCalculation');
+            
+            // Current user and time information
+            const currentDateTime = "2025-03-10 03:05:05";
+            const currentUser = "SRINJOY59";
+            
+            // Base API URL - change this to match your backend server
+            const API_BASE_URL = 'http://0.0.0.0:8000'; // Update this to your actual backend URL
+            
+            // Display welcome message with user info
+            const initialMessage = document.querySelector('.bot-message');
+            if (initialMessage) {
+                initialMessage.textContent = `Welcome to ChatBond.ai, ${currentUser}! I can help you find information about bonds, compare yields, analyze cash flows, and screen potential investments. What would you like to know today?`;
+            }
+            
+            // Toggle calculator form
+            calculatorToggle.addEventListener('click', function() {
+                calculatorForm.classList.toggle('active');
+                // Reset calculation results when opening
+                calculationResult.classList.remove('active');
+                resultValue.textContent = '--';
+            });
+    
+            // Hide calculator form
+            cancelCalculation.addEventListener('click', function() {
+                calculatorForm.classList.remove('active');
+            });
+            
+            // Close calculator with X button
+            closeCalculator.addEventListener('click', function() {
+                calculatorForm.classList.remove('active');
+            });
+    
+            // Handle bond calculation
+            submitCalculation.addEventListener('click', async function() {
+                const isin = document.getElementById('isin').value.trim();
+                
+                if (!isin) {
+                    alert('Please enter an ISIN');
+                    return;
+                }
+                
+                // Add user message showing the calculation request
+                addMessage(`Calculating yield for bond ${isin}...`, true);
+                
+                // Show loading indicator
+                const loadingMessage = document.createElement('div');
+                loadingMessage.className = 'message bot-message loading-message';
+                loadingMessage.innerHTML = 'Calculating <div class="loading-dots"><span></span><span></span><span></span></div>';
+                chatMessages.appendChild(loadingMessage);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+                
+                try {
+                    // DEBUG: For testing without backend
+                    if (!API_BASE_URL) {
+                        setTimeout(() => {
+                            if (chatMessages.contains(loadingMessage)) {
+                                chatMessages.removeChild(loadingMessage);
+                            }
+                            const mockYield = (Math.random() * 5 + 1).toFixed(2) + '%';
+                            addMessage(`Yield calculation for ${isin}: ${mockYield}`);
+                            resultValue.textContent = mockYield;
+                            calculationResult.classList.add('active');
+                        }, 1500);
+                        return;
+                    }
+                    
+                    const response = await fetch(`${API_BASE_URL}/calculate`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json'
+                        },
+                        body: JSON.stringify({ 
+                            query: isin
+                        }),
+                    });
+    
+                    // Safely remove loading message
+                    if (chatMessages.contains(loadingMessage)) {
+                        chatMessages.removeChild(loadingMessage);
+                    }
+    
+                    if (!response.ok) {
+                        throw new Error(`Calculation failed: ${response.status}`);
+                    }
+    
+                    const data = await response.json();
+                    
+                    // Show result in chat
+                    addMessage(`Yield calculation for ${isin}: ${data.result}`);
+                    
+                    // Show result in calculator panel
+                    resultValue.textContent = data.result;
+                    calculationResult.classList.add('active');
+                    
+                } catch (error) {
+                    // Safely remove loading message
+                    if (chatMessages.contains(loadingMessage)) {
+                        chatMessages.removeChild(loadingMessage);
+                    }
+                    console.error('Error:', error);
+                    addMessage('Sorry, there was an error calculating the bond yield. Please try again.');
+                }
+            });
+    
             agentBoxes.forEach(box => {
                 box.addEventListener('mouseenter', () => {
                     box.classList.add('pulse');
@@ -395,19 +755,19 @@
                 
                 box.addEventListener('click', () => {
                     let sampleQuestion = '';
-                    const agentTitle = box.querySelector('.agent-title').textContent;
+                    const agentType = box.getAttribute('data-agent');
                     
-                    switch(agentTitle) {
-                        case 'Bonds Directory Agent':
+                    switch(agentType) {
+                        case 'directory':
                             sampleQuestion = 'What information do you have on corporate bonds with AAA rating?';
                             break;
-                        case 'Bond Finder Agent':
+                        case 'finder':
                             sampleQuestion = 'Show me the highest yielding bonds available right now.';
                             break;
-                        case 'Cash Flow & Maturity Agent':
+                        case 'cashflow':
                             sampleQuestion = 'When is the next payment date for US Treasury bonds?';
                             break;
-                        case 'Bond Screener Agent':
+                        case 'screener':
                             sampleQuestion = 'Which companies have the strongest financial metrics in their bond offerings?';
                             break;
                     }
@@ -418,51 +778,93 @@
                     }
                 });
             });
-
+    
             function addMessage(text, isUser = false) {
                 const messageDiv = document.createElement('div');
                 messageDiv.className = `message ${isUser ? 'user-message' : 'bot-message'}`;
                 messageDiv.textContent = text;
                 chatMessages.appendChild(messageDiv);
                 chatMessages.scrollTop = chatMessages.scrollHeight;
+                
+                // If message is from the bot and mentions error, highlight it differently
+                if (!isUser && text.toLowerCase().includes('sorry') && text.toLowerCase().includes('error')) {
+                    messageDiv.style.borderLeft = '4px solid #e74c3c';
+                }
             }
-
+    
             async function sendMessage() {
                 const message = chatInput.value.trim();
                 if (message === '') return;
                 addMessage(message, true);
                 chatInput.value = '';
-
+    
+                // Add loading indicator
+                const loadingMessage = document.createElement('div');
+                loadingMessage.className = 'message bot-message loading-message';
+                loadingMessage.innerHTML = 'Thinking <div class="loading-dots"><span></span><span></span><span></span></div>';
+                chatMessages.appendChild(loadingMessage);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+    
                 try {
-                    const response = await fetch('/process_query', {
+                    // DEBUG: For testing without backend
+                    if (!API_BASE_URL) {
+                        setTimeout(() => {
+                            if (chatMessages.contains(loadingMessage)) {
+                                chatMessages.removeChild(loadingMessage);
+                            }
+                            const responses = [
+                                "I found several AAA-rated corporate bonds in our database. The highest yield is currently offered by Microsoft's 10-year bond at 3.45%.",
+                                "Based on your query, I recommend checking US Treasury bonds maturing in 2026. They offer a good balance of security and yield.",
+                                "The next payment date for most US Treasury bonds is June 15, 2025.",
+                                "I've analyzed the financial metrics and found that Apple, Microsoft, and Johnson & Johnson have the strongest balance sheets among bond issuers."
+                            ];
+                            const randomResponse = responses[Math.floor(Math.random() * responses.length)];
+                            addMessage(randomResponse);
+                        }, 1500);
+                        return;
+                    }
+                    
+                    const response = await fetch(`${API_BASE_URL}/process_query`, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
+                            'Accept': 'application/json'
                         },
-                        body: JSON.stringify({ user_query: message }),
+                        body: JSON.stringify({ 
+                            user_query: message
+                        }),
                     });
-
-                    if (!response.ok) {
-                        throw new Error('Network response was not ok');
+    
+                    // Safely remove loading message
+                    if (chatMessages.contains(loadingMessage)) {
+                        chatMessages.removeChild(loadingMessage);
                     }
-
+    
+                    if (!response.ok) {
+                        throw new Error(`Network response was not ok: ${response.status}`);
+                    }
+    
                     const data = await response.json();
                     addMessage(data.response);
                 } catch (error) {
+                    // Safely remove loading message
+                    if (chatMessages.contains(loadingMessage)) {
+                        chatMessages.removeChild(loadingMessage);
+                    }
                     console.error('Error:', error);
                     addMessage('Sorry, something went wrong. Please try again later.');
                 }
             }
-
+    
             sendButton.addEventListener('click', sendMessage);
             chatInput.addEventListener('keypress', (e) => {
                 if (e.key === 'Enter') {
                     sendMessage();
                 }
             });
-
+    
             chatInput.focus();
         });
     </script>
 </body>
-</html>
+</html>    
