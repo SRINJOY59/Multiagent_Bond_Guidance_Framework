@@ -322,7 +322,6 @@
         <div class="heading">ChatBond.ai</div>
     </header>
 
-
     <div class="main-container">
         <div class="agents-container">
             <div class="agents-grid">
@@ -384,8 +383,7 @@
             const sendButton = document.getElementById('sendButton');
             const chatMessages = document.getElementById('chatMessages');
             const agentBoxes = document.querySelectorAll('.agent-box');
-            
-            // Add pulse animation to agent boxes on hover
+
             agentBoxes.forEach(box => {
                 box.addEventListener('mouseenter', () => {
                     box.classList.add('pulse');
@@ -395,7 +393,6 @@
                     box.classList.remove('pulse');
                 });
                 
-                // Make agent boxes clickable to trigger sample questions
                 box.addEventListener('click', () => {
                     let sampleQuestion = '';
                     const agentTitle = box.querySelector('.agent-title').textContent;
@@ -421,71 +418,49 @@
                     }
                 });
             });
-            
-            // Sample responses for demonstration
-            const responses = {
-                "corporate bonds": "I've found 257 corporate bonds with AAA ratings. The top results include bonds from Microsoft (MSFT), Apple (AAPL), and Johnson & Johnson (JNJ) with yields ranging from 3.2% to 4.5% and maturities between 2026-2035.",
-                "highest yielding": "Based on current market data, the highest yielding bonds available are:\n\n1. XYZ Corp 2029 - 5.8% YTM (B+ rating)\n2. ABC Industries 2027 - 5.6% YTM (BBB- rating)\n3. Global Finance 2030 - 5.4% YTM (BBB rating)\n\nWould you like more details on any of these?",
-                "treasury": "The next payment dates for US Treasury bonds are:\n- 2-year notes: March 31, 2025\n- 10-year notes: April 15, 2025\n- 30-year bonds: May 15, 2025",
-                "financial metrics": "Based on our screener data, companies with the strongest financial metrics in their bond offerings are:\n\n1. Tech Innovations Inc. - Debt/EBITDA: 1.2, Interest Coverage: 12.5\n2. Consumer Basics Corp. - Debt/EBITDA: 1.4, Interest Coverage: 11.3\n3. Healthcare Solutions - Debt/EBITDA: 1.5, Interest Coverage: 10.8",
-                "default": "I don't have specific information about that query. Could you provide more details about what bond information you're looking for?"
-            };
 
-            // Function to add a message to the chat
             function addMessage(text, isUser = false) {
                 const messageDiv = document.createElement('div');
                 messageDiv.className = `message ${isUser ? 'user-message' : 'bot-message'}`;
                 messageDiv.textContent = text;
                 chatMessages.appendChild(messageDiv);
-                
-                // Scroll to bottom
                 chatMessages.scrollTop = chatMessages.scrollHeight;
             }
-            
-            // Function to get bot response
-            function getBotResponse(query) {
-                query = query.toLowerCase();
-                
-                // Check for keywords in the query
-                for (const [keyword, response] of Object.entries(responses)) {
-                    if (query.includes(keyword)) {
-                        return response;
-                    }
-                }
-                
-                return responses.default;
-            }
-            
-            // Function to handle sending a message
-            function sendMessage() {
+
+            async function sendMessage() {
                 const message = chatInput.value.trim();
-                
                 if (message === '') return;
-                
-                // Add user message
                 addMessage(message, true);
-                
-                // Clear input
                 chatInput.value = '';
-                
-                // Simulate thinking time
-                setTimeout(() => {
-                    // Add bot response
-                    const botResponse = getBotResponse(message);
-                    addMessage(botResponse);
-                }, 800);
+
+                try {
+                    const response = await fetch('/process_query', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ user_query: message }),
+                    });
+
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+
+                    const data = await response.json();
+                    addMessage(data.response);
+                } catch (error) {
+                    console.error('Error:', error);
+                    addMessage('Sorry, something went wrong. Please try again later.');
+                }
             }
-            
-            // Event listeners
+
             sendButton.addEventListener('click', sendMessage);
-            
             chatInput.addEventListener('keypress', (e) => {
                 if (e.key === 'Enter') {
                     sendMessage();
                 }
             });
-            
-            // Focus input on load
+
             chatInput.focus();
         });
     </script>
